@@ -1,128 +1,94 @@
-# GramArogya AI — EDA Findings (Phase 5)
+# GramArogya AI — EDA Findings
 
-Summary of the exploratory analysis in [`notebooks/eda.ipynb`](../notebooks/eda.ipynb).
-Dataset: `data/demand_resource_daily.csv` (2192 days, 2020-01-01 → 2025-12-31).
+Summary of the analysis in [`notebooks/eda.ipynb`](../notebooks/eda.ipynb).
+Dataset: `data/demand_resource_daily.csv` (2192 days, 2020-01-01 → 2025-12-31,
+**140 columns** after the operational-layer rebuild).
 
-**Bottom line:** the synthetic data behaves like a plausible rural hospital. It
-has strong, learnable structure; every driver moves the clinically correct
-demand category; and resource requirements scale with demand. The forecasting
-problem is realistic and well-posed for Phase 6.
+**Bottom line:** the demand series is realistic and unchanged; the regenerated
+operational layer now has genuine, explainable day-to-day variation. The
+forecasting problem is well-posed for Phase 6.
 
 ---
 
-## 1. Demand structure
+## Part 1 — Demand (unchanged, re-verified after regeneration)
 
-- Total arrivals: mean **138/day**, range **85-221**, std 23.
-- A clear, repeating **annual peak** every year (visible in the 30-day moving
-  average) — seasonality is learnable, not noise.
+- **Total arrivals:** mean 138/day, range 85-221; a clear repeating annual peak.
+- **Monsoon fever surge:** fever/infectious ~18 → ~60/day in months 7-9 (Monsoon
+  season mean 46 vs Post-Monsoon 16) — the dominant seasonal signal.
+- **Drivers map to the correct category:** humidity/rainfall → fever (0.66/0.49);
+  outbreak severity → fever/total (0.88/0.83); events/festival → trauma
+  (0.52/0.44); market day → OPD (0.46).
+- **Outbreaks vs scenarios (now separated):** disease outbreaks load fever
+  (Dengue ~68); `Mass_Casualty`/`Road_Accident_Surge` load trauma (~72).
+- **Subcategories reconcile exactly** with their parent categories, and shift
+  with context (Dengue → more `vector_borne_cases`, etc.).
 
-## 2. Seasonality — the dominant signal
+*(Demand-preservation was asserted programmatically: 32 immutable demand columns
+byte-identical; outbreak fields identical except the 8 Mass_Casualty relabels.)*
 
-| Season | fever_infectious | total |
-|---|---|---|
-| Winter | 24.5 | 134.3 |
-| Summer | 19.4 | 133.2 |
-| **Monsoon** | **46.1** | **153.1** |
-| Post-Monsoon | 16.3 | 119.6 |
+## Part 2 — Operational layer (regenerated)
 
-- **Fever/infectious cases nearly triple in monsoon (months 7-9)**, ~18 → ~60/day.
-  This mirrors real vector- and water-borne disease seasonality (dengue, malaria,
-  diarrhoeal) and is the main driver of the annual peak.
-- General OPD is steady (~85-95); maternal-child and trauma are roughly flat.
+### Beds & overflow
+- Bed occupancy is **sequential** (length-of-stay carryover), drifting smoothly
+  and brushing capacity on surges.
+- **Overflow occurs on ~4% of days** (93 days, max 11), **~30× more often on
+  outbreak/scenario days** (mean 0.32) than normal days (0.011). This fixes the
+  old `overflow_patients = 0` problem.
 
-## 3. Weekly & event effects (each moves the right category)
+### Specialists
+- OBGYN required duty hours span **8-24**; on-call mobilised on high-maternal days.
+- With only **1 OBGYN on staff**, the "minimum 2" policy flags a shortage on
+  **~20% of days** — a realistic rural specialist gap. `required_obgyn_doctors`
+  and `required_pediatricians` now vary (1-2) instead of being constant.
 
-- **Market day**: total load 153 vs 135 on other days; `weekly_market_day`
-  correlates with **general_opd** at r = 0.46 (rural travel-day visits).
-- **Festival**: trauma **doubles** (9.1 → 19.6); `festival_flag` ↔ trauma r = 0.44.
-- **Vaccination camp**: maternal-child 8.2 → 11.1.
-- Weekdays busier than weekends (Wed ~153, Sun ~124).
+### Medicine inventory
+- Stock **moves day-to-day** (`opening[t] == closing[t-1] + received[t]` holds
+  for every item), sawtoothing between consumption and lead-time deliveries.
+- Reorder flags toggle (61-134 reorders/item over 6 years); occasional shortages
+  on the fastest-moving items (ORS, test kits, PPE).
 
-## 4. Correlations — causally plausible drivers
+### Oxygen
+- Driven by **respiratory severity (r ≈ 0.98)**, not trauma (r ≈ 0.0) — the
+  corrected clinical logic.
 
-| Driver | Strongest with | r |
-|---|---|---|
-| humidity_pct / rainfall_mm | fever_infectious | 0.66 / 0.49 |
-| outbreak_severity_0_5 | fever_infectious / total | 0.88 / 0.83 |
-| local_event_intensity | trauma_emergency | 0.52 |
-| festival_flag | trauma_emergency | 0.44 |
-| weekly_market_day | general_opd | 0.46 |
+### Emergency risk
+- Distribution ≈ **Normal 45% / Watch 36% / High 16% / Critical 3%**.
+- **Critical days are almost entirely outbreak/scenario days**; `resource_shortage_count`
+  and `overflow_patients` rise monotonically with the risk level. Rules are
+  explainable (overflow, shortage count, outbreak/scenario severity).
 
-Every major feature has a clear, clinically sensible reason to affect its demand
-category — this satisfies the Phase 5 completion check.
+## Part 3 — Data caveats resolved
 
-## 5. Outbreak impact by type (mean cases)
-
-| Outbreak | fever_infectious | trauma | total | days |
-|---|---|---|---|---|
-| Dengue | 67.6 | 9.2 | 176.2 | 220 |
-| Malaria | 54.7 | 9.5 | 158.6 | 142 |
-| Respiratory | 41.9 | 8.9 | 164.3 | 162 |
-| Diarrheal | 34.8 | 8.9 | 156.9 | 125 |
-| Mass_Casualty | 14.5 | **72.2** | 186.5 | 8 |
-| None | 19.4 | 9.5 | 125.8 | 1535 |
-
-Disease outbreaks stress the **fever** channel; **Mass_Casualty** stresses
-**trauma** (~8× baseline). Different scenarios stress different resources —
-central to the Phase 12 emergency engine.
-
-## 6. Distributions
-
-- General OPD ≈ symmetric; **fever_infectious is right-skewed** with a long tail
-  (the monsoon/outbreak surges). No negative or impossible values.
-
-## 7. Resource planning follows demand (validates Phase 7 logic)
-
-| Demand | Resource | r |
-|---|---|---|
-| fever_infectious | required_antipyretic_units | 1.00 |
-| fever_infectious | required_diagnostic_test_kits | 0.98 |
-| fever_infectious | required_isolation_beds | 0.96 |
-| expected_admissions | required_general_beds | 0.97 |
-| trauma_emergency | required_emergency_beds | 0.85 |
-| trauma_emergency | required_ambulances | 0.75 |
-
-Emergency risk escalates monotonically with strain: mean `resource_shortage_count`
-is 0.0 (Normal) → 1.4 (Watch) → 2.4 (High) → 5.0 (Critical).
-
-## 8. Data caveats (carry into later phases)
-
-- **`overflow_patients` is constant 0** across all 2192 days — no signal. The
-  Phase 12 overload check must be computed from required-vs-available capacity +
-  thresholds, **not** this column.
-- **`required_obgyn_doctors` and `required_pediatricians` are constant = 1**
-  (fixed minimum staffing) — exclude where feature variance is required.
-- **`required_oxygen_cylinders` is driven by Respiratory outbreaks** (mean 10.4
-  vs 1.2 baseline; r = 0.59 with severity), not trauma (r = 0.04). Model the
-  oxygen requirement around respiratory load.
+The three Phase-5 caveats are now fixed:
+- `overflow_patients` — was constant 0; now varies and concentrates on surges.
+- `required_obgyn_doctors` / `required_pediatricians` — were constant; now vary.
+- oxygen — now explicitly modelled from respiratory severity.
 
 ---
 
 ## Leakage-safe feature list (locked for Phase 6)
 
-The demand model predicts the **targets** and may use **only** these inputs.
+The demand model predicts the **6 targets** and may use **only** these **26
+features**; all **106 operational columns are excluded** (asserted in the notebook).
 
-**Features (26) — Group A predictors + lag/rolling:**
-
-- *Calendar/time:* `day_of_week_num`, `week_of_year`, `month`, `season`,
-  `is_weekend`, `public_holiday`, `festival_flag`, `weekly_market_day`,
-  `vaccination_camp_flag`, `maternal_clinic_day`, `local_event_intensity`
-- *Weather:* `rainfall_mm`, `temperature_max_c`, `temperature_min_c`, `humidity_pct`
-- *Outbreak/surveillance:* `outbreak_type`, `outbreak_severity_0_5`,
-  `surveillance_alert`, `affected_villages`
-- *Lag/rolling (past demand only):* `patients_lag_1`, `patients_lag_2`,
-  `patients_lag_7`, `patients_lag_14`, `rolling_mean_7`, `rolling_std_7`,
-  `rolling_mean_14`
+**Features (26):** calendar/time (`day_of_week_num`, `week_of_year`, `month`,
+`season`, `is_weekend`, `public_holiday`, `festival_flag`, `weekly_market_day`,
+`vaccination_camp_flag`, `maternal_clinic_day`, `local_event_intensity`),
+weather (`rainfall_mm`, `temperature_max_c`, `temperature_min_c`, `humidity_pct`),
+outbreak/surveillance (`outbreak_type`, `outbreak_severity_0_5`,
+`surveillance_alert`, `affected_villages`), lag/rolling (`patients_lag_1/2/7/14`,
+`rolling_mean_7`, `rolling_std_7`, `rolling_mean_14`).
 
 **Targets (6):** `general_opd_arrivals`, `fever_infectious_arrivals`,
 `maternal_child_arrivals`, `trauma_emergency_arrivals`, `total_patient_arrivals`,
-`expected_admissions`
+`expected_admissions`.
 
-**Excluded — never use as model inputs (34):** all `required_*`, `available_*`,
-`stock_*` columns, plus `resource_shortage_count`, `overflow_patients`,
-`emergency_risk_level`. These are computed *from* the forecast (Group C/D) and
-would leak the target.
+**Excluded (106):** all operational columns — scenarios, subcategories, beds,
+inventory, specialists, oxygen, required staff/ambulance, shortages, and
+`emergency_risk_level`. Computed *from* the forecast; using them would leak the
+target.
 
+> `emergency_scenario_type`/`_severity` could become forecast inputs later, but
+> only using information genuinely known at forecast time.
 > Modelling note: `outbreak_type` needs categorical encoding; the first
-> 1/2/7/14 rows have null lag/rolling values by construction — drop or impute at
-> training time.
+> 1/2/7/14 rows have null lag/rolling values by construction.

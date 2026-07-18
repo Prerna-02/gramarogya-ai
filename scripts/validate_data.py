@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -33,6 +34,7 @@ MERGED_CSV = DATA_DIR / "demand_resource_daily.csv"
 #  - lag/rolling features are undefined for the first N rows of the series
 EXPECTED_NULLABLE = {
     "outbreak_type",
+    "emergency_scenario_type",
     "patients_lag_1",
     "patients_lag_2",
     "patients_lag_7",
@@ -259,6 +261,98 @@ def validate_staff(df: pd.DataFrame, rep: Report) -> None:
                 rep.critical_(f"staff: {col} out of [{lo}, {hi}] for {bad['staff_id'].tolist()}")
 
 
+MED_ITEMS = ["iv_fluids", "ors", "diagnostic_test_kits", "antipyretics", "ppe_kits"]
+BED_TYPES = ["general", "emergency", "isolation"]
+FEVER_SUBCATS = ["vector_borne_cases", "respiratory_cases", "gastrointestinal_cases", "other_fever_cases"]
+MCH_SUBCATS = ["pediatric_cases", "antenatal_cases", "obstetric_emergency_cases", "immunization_visits"]
+
+
+def validate_operational(df: pd.DataFrame, rep: Report) -> None:
+    """Checks specific to the regenerated operational/resource layer (post-Phase 5)."""
+    if "overflow_patients" not in df.columns:
+        rep.info_("operational layer not present (pre-regeneration file) — skipping ops checks")
+        return
+    rep.section("operational layer")
+
+    def varies(col):
+        return col in df.columns and df[col].nunique() > 1
+
+    def has_zero_and_one(col):
+        return col in df.columns and {0, 1}.issubset(set(df[col].unique()))
+
+    # -- Classification --
+    if "Mass_Casualty" in df["outbreak_type"].fillna("None").unique():
+        rep.critical_("classification: Mass_Casualty must NOT be in outbreak_type")
+    else:
+        rep.info_("classification: Mass_Casualty absent from outbreak_type")
+    if "emergency_scenario_type" in df.columns and df["emergency_scenario_type"].notna().any():
+        rep.info_(f"classification: emergency scenarios present {df['emergency_scenario_type'].dropna().unique().tolist()}")
+    else:
+        rep.critical_("classification: emergency_scenario_type has no scenarios")
+    if "trauma_emergency_arrivals" not in df.columns:
+        rep.critical_("classification: trauma_emergency_arrivals (demand category) missing")
+
+    # -- Variation --
+    ov = df["overflow_patients"]
+    if (ov == 0).any() and (ov > 0).any():
+        rep.info_(f"variation: overflow_patients has zeros and non-zeros ({int((ov > 0).sum())} overflow days)")
+    else:
+        rep.critical_("variation: overflow_patients lacks both zero and non-zero values")
+    for col in ["required_obgyn_duty_hours", "obgyn_on_call_required",
+                "required_pediatrician_duty_hours", "pediatrician_on_call_required",
+                "required_obgyn_doctors", "required_pediatricians", "resource_shortage_count"]:
+        if not varies(col):
+            rep.critical_(f"variation: {col} does not vary")
+    for item in MED_ITEMS:
+        if f"closing_stock_{item}" in df.columns and df[f"closing_stock_{item}"].nunique() <= 10:
+            rep.warn(f"variation: closing_stock_{item} shows little movement")
+        if not has_zero_and_one(f"{item}_reorder_flag"):
+            rep.warn(f"variation: {item}_reorder_flag is not both 0 and 1")
+    if "emergency_risk_level" in df.columns:
+        levels = set(df["emergency_risk_level"].unique())
+        if not {"Normal", "Watch", "High", "Critical"}.issubset(levels):
+            rep.warn(f"variation: emergency_risk_level missing some levels ({sorted(levels)})")
+        else:
+            rep.info_(f"variation: all four emergency_risk_levels present {df['emergency_risk_level'].value_counts().to_dict()}")
+
+    # -- Sequential --
+    for item in MED_ITEMS:
+        cols = [f"opening_stock_{item}", f"closing_stock_{item}", f"received_{item}"]
+        if all(c in df.columns for c in cols):
+            op, cl, rc = df[f"opening_stock_{item}"].to_numpy(), df[f"closing_stock_{item}"].to_numpy(), df[f"received_{item}"].to_numpy()
+            if not np.all(op[1:] == cl[:-1] + rc[1:]):
+                rep.critical_(f"sequential: {item} opening[t] != closing[t-1] + received[t]")
+    for bt in BED_TYPES:
+        cols = [f"occupied_{bt}_beds", f"total_{bt}_beds", f"out_of_service_{bt}_beds",
+                f"projected_{bt}_occupancy", f"overflow_{bt}_patients"]
+        if all(c in df.columns for c in cols):
+            usable = df[f"total_{bt}_beds"] - df[f"out_of_service_{bt}_beds"]
+            if not (df[f"occupied_{bt}_beds"] <= usable).all():
+                rep.critical_(f"sequential: {bt} occupancy exceeds usable beds")
+            exp_overflow = np.maximum(0, df[f"projected_{bt}_occupancy"] - usable)
+            if not (df[f"overflow_{bt}_patients"] == exp_overflow).all():
+                rep.critical_(f"sequential: {bt} overflow != max(0, projected - usable)")
+    rep.info_("sequential: medicine and bed carryover invariants checked")
+
+    # -- Logical --
+    if set(FEVER_SUBCATS).issubset(df.columns):
+        if (df[FEVER_SUBCATS].sum(axis=1) != df["fever_infectious_arrivals"]).any():
+            rep.critical_("logical: fever subcategories do not sum to fever_infectious_arrivals")
+        else:
+            rep.info_("logical: fever subcategories reconcile")
+    if set(MCH_SUBCATS).issubset(df.columns):
+        if (df[MCH_SUBCATS].sum(axis=1) != df["maternal_child_arrivals"]).any():
+            rep.critical_("logical: maternal-child subcategories do not sum to maternal_child_arrivals")
+        else:
+            rep.info_("logical: maternal-child subcategories reconcile")
+    if {"severe_respiratory_cases", "required_oxygen_cylinders"}.issubset(df.columns):
+        r = df["severe_respiratory_cases"].corr(df["required_oxygen_cylinders"])
+        if r < 0.5:
+            rep.warn(f"logical: oxygen weakly correlated with respiratory severity (r={r:.2f})")
+        else:
+            rep.info_(f"logical: oxygen driven by respiratory severity (r={r:.2f})")
+
+
 def main() -> int:
     rep = Report()
     print("=" * 60)
@@ -266,7 +360,9 @@ def main() -> int:
     print("=" * 60)
 
     if MERGED_CSV.exists():
-        validate_daily(pd.read_csv(MERGED_CSV), "demand_resource_daily", rep)
+        merged = pd.read_csv(MERGED_CSV)
+        validate_daily(merged, "demand_resource_daily", rep)
+        validate_operational(merged, rep)
     else:
         rep.info_("demand_resource_daily.csv not found yet (run merge_datasets.py)")
         if DEMAND_CSV.exists():
