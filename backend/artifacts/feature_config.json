@@ -1,0 +1,56 @@
+{
+  "features": [
+    "day_of_week_num",
+    "week_of_year",
+    "month",
+    "season_enc",
+    "is_weekend",
+    "public_holiday",
+    "festival_flag",
+    "weekly_market_day",
+    "vaccination_camp_flag",
+    "maternal_clinic_day",
+    "local_event_intensity",
+    "rainfall_mm",
+    "temperature_max_c",
+    "temperature_min_c",
+    "humidity_pct",
+    "outbreak_type_enc",
+    "outbreak_severity_0_5",
+    "surveillance_alert",
+    "affected_villages",
+    "patients_lag_1",
+    "patients_lag_2",
+    "patients_lag_7",
+    "patients_lag_14",
+    "rolling_mean_7",
+    "rolling_std_7",
+    "rolling_mean_14"
+  ],
+  "targets": [
+    "total_patient_arrivals",
+    "general_opd_arrivals",
+    "fever_infectious_arrivals",
+    "maternal_child_arrivals",
+    "trauma_emergency_arrivals",
+    "expected_admissions"
+  ],
+  "season_map": {
+    "Winter": 0,
+    "Summer": 1,
+    "Monsoon": 2,
+    "Post_Monsoon": 3
+  },
+  "outbreak_map": {
+    "None": 0,
+    "Dengue": 1,
+    "Malaria": 2,
+    "Diarrheal": 3,
+    "Respiratory": 4
+  },
+  "split": {
+    "train_end": "2023-12-31",
+    "val_end": "2024-12-31"
+  },
+  "selected_family": "XGBoost"
+}

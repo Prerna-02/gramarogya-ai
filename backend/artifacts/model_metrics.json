@@ -1,0 +1,197 @@
+{
+  "selected_family": "XGBoost",
+  "test_metrics": [
+    {
+      "target": "total_patient_arrivals",
+      "model": "Naive",
+      "R2": 0.6340014528943055,
+      "MAE": 11.01917808219178,
+      "RMSE": 14.772799884868006,
+      "WAPE": 0.07628549210022191
+    },
+    {
+      "target": "total_patient_arrivals",
+      "model": "SeasonalNaive",
+      "R2": 0.43977263669399524,
+      "MAE": 11.117808219178082,
+      "RMSE": 18.27701603294403,
+      "WAPE": 0.076968306052387
+    },
+    {
+      "target": "total_patient_arrivals",
+      "model": "RandomForest",
+      "R2": 0.9169327513695638,
+      "MAE": 5.418355579628957,
+      "RMSE": 7.037818250060399,
+      "WAPE": 0.03751113909611686
+    },
+    {
+      "target": "total_patient_arrivals",
+      "model": "XGBoost",
+      "R2": 0.9298665173633568,
+      "MAE": 5.181863298808059,
+      "RMSE": 6.466746501356659,
+      "WAPE": 0.03587390899730557
+    },
+    {
+      "target": "general_opd_arrivals",
+      "model": "Naive",
+      "R2": -0.020628272177625195,
+      "MAE": 9.213698630136987,
+      "RMSE": 11.429953438944464,
+      "WAPE": 0.09631135803883384
+    },
+    {
+      "target": "general_opd_arrivals",
+      "model": "SeasonalNaive",
+      "R2": 0.6957485396035453,
+      "MAE": 4.484931506849315,
+      "RMSE": 6.240609383662148,
+      "WAPE": 0.04688126467724383
+    },
+    {
+      "target": "general_opd_arrivals",
+      "model": "RandomForest",
+      "R2": 0.7233959544469619,
+      "MAE": 5.173310128066888,
+      "RMSE": 5.950314598715809,
+      "WAPE": 0.05407692871139281
+    },
+    {
+      "target": "general_opd_arrivals",
+      "model": "XGBoost",
+      "R2": 0.7477045845097633,
+      "MAE": 4.9196105329957724,
+      "RMSE": 5.682838885378005,
+      "WAPE": 0.0514249912521753
+    },
+    {
+      "target": "fever_infectious_arrivals",
+      "model": "Naive",
+      "R2": 0.8942886848234562,
+      "MAE": 3.9013698630136986,
+      "RMSE": 6.315885603690437,
+      "WAPE": 0.1274957471573104
+    },
+    {
+      "target": "fever_infectious_arrivals",
+      "model": "SeasonalNaive",
+      "R2": 0.5854606283434107,
+      "MAE": 6.8712328767123285,
+      "RMSE": 12.507093877487048,
+      "WAPE": 0.2245500940102068
+    },
+    {
+      "target": "fever_infectious_arrivals",
+      "model": "RandomForest",
+      "R2": 0.9837416317979154,
+      "MAE": 1.9512008809642083,
+      "RMSE": 2.476920084098392,
+      "WAPE": 0.06376473467203295
+    },
+    {
+      "target": "fever_infectious_arrivals",
+      "model": "XGBoost",
+      "R2": 0.9827642029606891,
+      "MAE": 2.0235182958106472,
+      "RMSE": 2.550287856486295,
+      "WAPE": 0.0661280488827009
+    },
+    {
+      "target": "maternal_child_arrivals",
+      "model": "Naive",
+      "R2": -1.1529035117071982,
+      "MAE": 3.4356164383561643,
+      "RMSE": 4.227114045147697,
+      "WAPE": 0.40913539967373574
+    },
+    {
+      "target": "maternal_child_arrivals",
+      "model": "SeasonalNaive",
+      "R2": 0.6068524865925677,
+      "MAE": 1.3835616438356164,
+      "RMSE": 1.8063813823858286,
+      "WAPE": 0.16476345840130505
+    },
+    {
+      "target": "maternal_child_arrivals",
+      "model": "RandomForest",
+      "R2": 0.8715100020583875,
+      "MAE": 0.8316778448902329,
+      "RMSE": 1.032681371826574,
+      "WAPE": 0.0990415704355416
+    },
+    {
+      "target": "maternal_child_arrivals",
+      "model": "XGBoost",
+      "R2": 0.8744354009839876,
+      "MAE": 0.8337737723572614,
+      "RMSE": 1.0208578882844683,
+      "WAPE": 0.09929116701807517
+    },
+    {
+      "target": "trauma_emergency_arrivals",
+      "model": "Naive",
+      "R2": -1.1268871864395393,
+      "MAE": 4.704109589041096,
+      "RMSE": 7.80112390919253,
+      "WAPE": 0.48081769812377484
+    },
+    {
+      "target": "trauma_emergency_arrivals",
+      "model": "SeasonalNaive",
+      "R2": -0.4741617576384616,
+      "MAE": 2.778082191780822,
+      "RMSE": 6.494676429030797,
+      "WAPE": 0.28395407448893867
+    },
+    {
+      "target": "trauma_emergency_arrivals",
+      "model": "RandomForest",
+      "R2": 0.6250328890401359,
+      "MAE": 1.5954807364015682,
+      "RMSE": 3.2755296649203824,
+      "WAPE": 0.16307770058431037
+    },
+    {
+      "target": "trauma_emergency_arrivals",
+      "model": "XGBoost",
+      "R2": 0.7765502410326041,
+      "MAE": 1.5681175597726482,
+      "RMSE": 2.528569493127635,
+      "WAPE": 0.1602808483105619
+    },
+    {
+      "target": "expected_admissions",
+      "model": "Naive",
+      "R2": 0.02694520589209881,
+      "MAE": 1.3726027397260274,
+      "RMSE": 2.0891107107197158,
+      "WAPE": 0.15869496357301235
+    },
+    {
+      "target": "expected_admissions",
+      "model": "SeasonalNaive",
+      "R2": -0.13614684057796378,
+      "MAE": 1.452054794520548,
+      "RMSE": 2.257407896450906,
+      "WAPE": 0.16788089958821667
+    },
+    {
+      "target": "expected_admissions",
+      "model": "RandomForest",
+      "R2": 0.7661744917650444,
+      "MAE": 0.8087221224754035,
+      "RMSE": 1.024091474820065,
+      "WAPE": 0.09350129068847714
+    },
+    {
+      "target": "expected_admissions",
+      "model": "XGBoost",
+      "R2": 0.7692292613333473,
+      "MAE": 0.7858843751149635,
+      "RMSE": 1.0173799567568702,
+      "WAPE": 0.09086087960625963
+    }
+  ]
+}
