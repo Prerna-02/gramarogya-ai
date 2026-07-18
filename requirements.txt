@@ -1,0 +1,32 @@
+# GramArogya AI — Python dependencies (pip)
+#
+
+
+# Scientific / ML
+numpy
+pandas
+scikit-learn
+xgboost
+joblib
+pymoo
+
+# Backend
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+
+# Database
+sqlalchemy
+psycopg[binary]
+alembic
+
+# Auth / security
+passlib[bcrypt]
+python-jose[cryptography]
+python-dotenv
+
+# Testing
+pytest
+httpx

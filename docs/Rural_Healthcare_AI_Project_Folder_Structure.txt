@@ -1,0 +1,116 @@
+RURAL HEALTHCARE AI PROJECT - RECOMMENDED VS CODE STRUCTURE
+
+rural-healthcare-ai/
+|
+|-- README.md
+|-- .gitignore
+|-- .env.example
+|-- requirements.txt
+|-- package.json                         # Optional root helper scripts only
+|
+|-- data/
+|   |-- demand_resource_daily.csv
+|   `-- staff_master.csv
+|
+|-- backend/
+|   |-- __init__.py
+|   |-- main.py                          # FastAPI app and router registration
+|   |-- config.py                        # Environment settings
+|   |-- db.py                            # PostgreSQL connection/session
+|   |-- db_models.py                     # SQLAlchemy database models
+|   |-- schemas.py                       # Pydantic request/response schemas
+|   |-- routes.py                        # API endpoints
+|   |-- auth.py                          # Login, password and role checks
+|   |-- seed_database.py                 # Import the two CSV files
+|   |
+|   |-- services/
+|   |   |-- __init__.py
+|   |   |-- forecasting.py               # Feature engineering and 1-7 day prediction
+|   |   |-- resource_planning.py         # Staff/bed/medicine/equipment calculations
+|   |   |-- workforce_optimization.py    # NSGA-II roster generation
+|   |   |-- emergency.py                 # Capacity thresholds and alert logic
+|   |   |-- patient_routing.py           # Facility ranking for patient interface
+|   |   `-- planning_orchestrator.py      # Runs all services using planning_run_id
+|   |
+|   `-- artifacts/
+|       |-- demand_model.joblib
+|       |-- feature_config.json
+|       `-- model_metrics.json
+|
+|-- frontend/
+|   |-- package.json
+|   |-- vite.config.js
+|   |-- index.html
+|   `-- src/
+|       |-- main.jsx
+|       |-- App.jsx
+|       |-- api.js                       # All frontend requests to FastAPI
+|       |
+|       |-- components/
+|       |   |-- Layout.jsx
+|       |   |-- MetricCard.jsx
+|       |   |-- ForecastChart.jsx
+|       |   |-- DataTable.jsx
+|       |   `-- ProtectedRoute.jsx
+|       |
+|       |-- pages/
+|       |   |-- LoginPage.jsx
+|       |   |-- admin/
+|       |   |   |-- DashboardPage.jsx
+|       |   |   |-- ForecastPage.jsx
+|       |   |   |-- ResourcePlanPage.jsx
+|       |   |   |-- WorkforcePage.jsx
+|       |   |   |-- EmergencyPage.jsx
+|       |   |   `-- FairnessPage.jsx
+|       |   `-- patient/
+|       |       |-- PatientHomePage.jsx
+|       |       |-- FacilitySearchPage.jsx
+|       |       |-- FacilityDetailsPage.jsx
+|       |       `-- PatientEmergencyPage.jsx
+|       |
+|       `-- styles/
+|           `-- app.css
+|
+|-- scripts/
+|   |-- validate_data.py                 # Validate the two CSV files
+|   |-- train_forecast_model.py          # Train/evaluate/save demand model
+|   `-- generate_demo_forecast.py        # Create 1-7 Jan 2026 demo output
+|
+`-- tests/
+    |-- test_forecasting.py
+    |-- test_resource_planning.py
+    |-- test_workforce_optimization.py
+    |-- test_emergency.py
+    `-- test_api.py
+
+WHY THIS STRUCTURE IS KEPT SMALL
+- One backend folder, one frontend application and one database.
+- One React application serves both /admin and /patient routes.
+- Only the five business services are separated because they contain different logic.
+- Exactly two source CSV files remain in data/.
+- Forecast outputs, resource plans, rosters and alerts are stored in PostgreSQL, not as additional manually maintained CSV files.
+
+SUGGESTED CREATION ORDER IN VS CODE
+1. Create rural-healthcare-ai and open it in VS Code.
+2. Create the root files: README.md, .gitignore, .env.example and requirements.txt.
+3. Create data, backend, frontend, scripts and tests.
+4. Inside backend, create services and artifacts.
+5. Create the listed backend Python files.
+6. Create the React/Vite application inside frontend, then replace its src structure with the folders above.
+7. Place only demand_resource_daily.csv and staff_master.csv inside data.
+8. Initialize Git from the root folder.
+
+GIT COMMANDS (RUN FROM THE ROOT FOLDER)
+git init
+git add .
+git commit -m "Initialize rural healthcare AI project"
+git branch -M main
+git remote add origin <YOUR_GITHUB_REPOSITORY_URL>
+git push -u origin main
+git checkout -b develop
+git push -u origin develop
+
+IMPORTANT
+- Do not commit .env, node_modules, Python virtual environments, __pycache__, local database dumps or logs.
+- Use .env.example to show variable names such as DATABASE_URL and SECRET_KEY without exposing real values.
+- Keep generated model files in backend/artifacts only when they are small enough for normal repository use; otherwise document how to recreate them.

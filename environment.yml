@@ -1,0 +1,36 @@
+name: gramarogya
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - nodejs=22
+  - pip
+  # Scientific / ML stack (prebuilt binaries from conda-forge)
+  - numpy
+  - pandas
+  - scikit-learn
+  - xgboost
+  - matplotlib
+  - seaborn
+  - jupyter
+  - pip:
+      # Backend web framework
+      - fastapi
+      - "uvicorn[standard]"
+      - pydantic
+      - pydantic-settings
+      - python-multipart
+      # Database
+      - sqlalchemy
+      - "psycopg[binary]"
+      - alembic
+      # Auth / security
+      - "passlib[bcrypt]"
+      - "python-jose[cryptography]"
+      - python-dotenv
+      # ML / optimization
+      - joblib
+      - pymoo
+      # Testing
+      - pytest
+      - httpx
