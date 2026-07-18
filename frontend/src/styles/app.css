@@ -1,0 +1,144 @@
+/* GramArogya AI — shared application styles (Phase 2 skeleton). */
+
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  color: #fff;
+}
+
+.layout-header.admin {
+  background: #1e3a8a;
+}
+
+.layout-header.patient {
+  background: #047857;
+}
+
+.brand {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.brand span {
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+.role-badge {
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+}
+
+.layout-main {
+  flex: 1;
+  padding: 2rem 1.5rem;
+}
+
+/* ---- Landing ---- */
+.landing {
+  max-width: 760px;
+  margin: 4rem auto;
+  text-align: center;
+  padding: 0 1.25rem;
+}
+
+.landing h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.landing .accent {
+  color: #047857;
+}
+
+.tagline {
+  color: #475569;
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.health-pill {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 2.5rem;
+}
+
+.health-pill.checking {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.health-pill.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.health-pill.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.entry-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.entry-card {
+  display: block;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  text-align: left;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.entry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.entry-card.admin {
+  border-top: 4px solid #1e3a8a;
+}
+
+.entry-card.patient {
+  border-top: 4px solid #047857;
+}
+
+.entry-card p {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* ---- Generic ---- */
+.placeholder,
+.centered {
+  max-width: 640px;
+  margin: 2rem auto;
+  text-align: center;
+}
+
+.placeholder p,
+.centered p {
+  color: #64748b;
+}
+
+.back-link {
+  color: #1e3a8a;
+  font-weight: 500;
+}
