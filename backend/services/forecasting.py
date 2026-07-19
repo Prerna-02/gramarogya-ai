@@ -118,3 +118,51 @@ def backtest_latest(n: int = 30) -> list[dict]:
     pred = bundle["models"]["total_patient_arrivals"].predict(X)
     return [{"date": d.date().isoformat(), "actual": int(a), "predicted": round(float(p), 1)}
             for d, a, p in zip(hist["date"], hist["total_patient_arrivals"], pred)]
+
+
+def last_data_date() -> date:
+    return _history()["date"].max().date()
+
+
+def total_series(start, horizon: int) -> dict:
+    """Total-patient series from `start` for `horizon` days.
+
+    For dates within the historical data: returns actual + model prediction
+    (the model was trained/tested, so we can show both). For future dates:
+    returns the forecast (predicted only, actual = null).
+    """
+    bundle, config = _load()
+    hist = _history().copy()
+    hist["season_enc"] = hist["season"].map(config["season_map"])
+    hist["outbreak_type_enc"] = hist["outbreak_type"].fillna("None").map(config["outbreak_map"])
+    heng = hist.dropna(subset=config["features"]).copy()
+    heng.index = heng["date"].dt.date
+    model = bundle["models"]["total_patient_arrivals"]
+    last = hist["date"].max().date()
+
+    if isinstance(start, str):
+        start = datetime.strptime(start, "%Y-%m-%d").date()
+    dates = [start + timedelta(days=i) for i in range(horizon)]
+    out = []
+    fut = [d for d in dates if d > last]
+    for d in dates:
+        if d <= last:
+            if d in heng.index:
+                X = heng.loc[[d], config["features"]].astype(float)
+                out.append({"date": d.isoformat(), "actual": int(heng.loc[d, "total_patient_arrivals"]),
+                            "predicted": round(float(model.predict(X)[0]), 1)})
+            else:  # before the series warm-up window
+                out.append({"date": d.isoformat(), "actual": None, "predicted": None})
+    if fut:
+        for f in future_forecast(fut[0], len(fut)):
+            out.append({"date": f["date"], "actual": None, "predicted": f["total_patient_arrivals"]})
+    out.sort(key=lambda r: r["date"])
+    return {"start": start.isoformat(), "horizon": horizon,
+            "is_future": start > last, "last_data_date": last.isoformat(), "series": out}
+
+
+def model_metrics() -> dict:
+    path = ARTIFACTS / "model_metrics.json"
+    if not path.exists():
+        raise ModelNotTrained("Model metrics not found. Run scripts/train_forecast_model.py.")
+    return json.loads(path.read_text())

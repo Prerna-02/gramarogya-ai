@@ -47,6 +47,12 @@ def main() -> int:
     import backend.db_models  # noqa: F401  (registers models)
 
     Base.metadata.create_all(engine)
+
+    # Lightweight migrations for columns added after the first release.
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE nearby_facilities ADD COLUMN IF NOT EXISTS latitude double precision"))
+        conn.execute(text("ALTER TABLE nearby_facilities ADD COLUMN IF NOT EXISTS longitude double precision"))
+
     print(f"Created {len(Base.metadata.tables)} tables: {', '.join(sorted(Base.metadata.tables))}")
     return 0
 

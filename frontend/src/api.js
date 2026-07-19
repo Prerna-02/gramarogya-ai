@@ -55,6 +55,10 @@ export const api = {
   forecastLatest: () => request('/api/forecast/latest'),
   forecastRun: (horizon_days = 7) =>
     request('/api/forecast/run', { method: 'POST', body: { horizon_days } }),
+  forecastSeries: (start, horizon = 14) =>
+    request(`/api/forecast/series?start=${start}&horizon=${horizon}`),
+  forecastBounds: () => request('/api/forecast/bounds'),
+  modelMetrics: () => request('/api/forecast/model-metrics'),
   resourcesPlan: (horizon_days = 7) =>
     request('/api/resources/plan', { method: 'POST', body: { horizon_days } }),
   workforceGenerate: (roster_horizon_days = 7) =>

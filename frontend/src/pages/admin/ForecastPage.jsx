@@ -6,95 +6,130 @@ import {
 import { api } from '../../api.js'
 
 const HORIZONS = [7, 14, 21, 30]
-
-// Fixed categorical order + hues (never cycled). Total is the dark anchor line.
-const SERIES = [
-  { key: 'total_patient_arrivals', name: 'Total', color: '#0f172a', width: 2.5 },
-  { key: 'general_opd_arrivals', name: 'General OPD', color: '#2563eb', width: 1.6 },
-  { key: 'fever_infectious_arrivals', name: 'Fever/infectious', color: '#ea580c', width: 1.6 },
-  { key: 'maternal_child_arrivals', name: 'Maternal-child', color: '#059669', width: 1.6 },
-  { key: 'trauma_emergency_arrivals', name: 'Trauma/emergency', color: '#7c3aed', width: 1.6 },
-]
+const ACTUAL = '#ea580c'
+const PREDICTED = '#1e40af'
 
 export default function ForecastPage() {
+  const [bounds, setBounds] = useState(null)
+  const [start, setStart] = useState('')
   const [horizon, setHorizon] = useState(14)
-  const [forecast, setForecast] = useState(null)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const [metrics, setMetrics] = useState(null)
+  const [showMetrics, setShowMetrics] = useState(false)
+
   useEffect(() => {
-    setLoading(true)
-    setError('')
-    api.forecastRun(horizon)
-      .then((d) => setForecast(d.forecast))
+    api.forecastBounds().then((b) => {
+      setBounds(b)
+      // default start = day after last data (future forecast)
+      const d = new Date(b.last_data_date)
+      d.setDate(d.getDate() + 1)
+      setStart(d.toISOString().slice(0, 10))
+    }).catch((e) => setError(e.message))
+  }, [])
+
+  useEffect(() => {
+    if (!start) return
+    setLoading(true); setError('')
+    api.forecastSeries(start, horizon)
+      .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [horizon])
+  }, [start, horizon])
+
+  const loadMetrics = () => {
+    setShowMetrics((v) => !v)
+    if (!metrics) api.modelMetrics().then(setMetrics).catch(() => {})
+  }
+
+  const total = (t) => data?.series.filter((r) => r[t] != null).length
 
   return (
     <div className="dashboard">
       <div className="page-head">
         <div>
           <h1>Demand Forecast</h1>
-          <p className="muted">Predicted patient arrivals by service category. Choose a horizon.</p>
+          <p className="muted">Total patient inflow. Pick a start date — past dates show actual vs
+            predicted; future dates show the forecast.</p>
         </div>
-        <div className="segmented">
-          {HORIZONS.map((h) => (
-            <button key={h} className={horizon === h ? 'seg active' : 'seg'} onClick={() => setHorizon(h)}>
-              {h} days
-            </button>
-          ))}
+        <div className="controls-row">
+          <input type="date" value={start} min={bounds?.min_date} max="2026-12-31"
+            onChange={(e) => setStart(e.target.value)} />
+          <div className="segmented">
+            {HORIZONS.map((h) => (
+              <button key={h} className={horizon === h ? 'seg active' : 'seg'} onClick={() => setHorizon(h)}>{h}d</button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {error && <div className="banner error">Could not load forecast: {error}</div>}
-      {loading && <div className="banner">Forecasting {horizon} days…</div>}
+      {error && <div className="banner error">{error}</div>}
+      {loading && <div className="banner">Loading forecast…</div>}
 
-      {forecast && !loading && (
+      {data && !loading && (
         <>
           <section className="panel">
-            <h2>{horizon}-day forecast</h2>
+            <div className="panel-head">
+              <h2>Total patient inflow</h2>
+              <span className={`pill ${data.is_future ? 'tone-warn' : 'tone-good'}`}>
+                {data.is_future ? 'Future forecast' : 'Backtest (actual vs predicted)'}
+              </span>
+            </div>
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={forecast} margin={{ top: 8, right: 16, bottom: 4, left: -8 }}>
+              <LineChart data={data.series} margin={{ top: 8, right: 16, bottom: 4, left: -8 }}>
                 <CartesianGrid stroke="#eef1f5" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={(d) => d.slice(5)} minTickGap={20}
                   tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
                 <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} width={44} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                {SERIES.map((s) => (
-                  <Line key={s.key} type="monotone" dataKey={s.key} name={s.name}
-                    stroke={s.color} strokeWidth={s.width} dot={false} />
-                ))}
+                {total('actual') > 0 && (
+                  <Line type="monotone" dataKey="actual" name="Actual" stroke={ACTUAL}
+                    strokeWidth={2} dot={false} connectNulls />
+                )}
+                <Line type="monotone" dataKey="predicted" name="Predicted" stroke={PREDICTED}
+                  strokeWidth={2} dot={false} connectNulls />
               </LineChart>
             </ResponsiveContainer>
+            <p className="muted small">{data.is_future
+              ? 'These dates are beyond the historical data, so only the forecast is shown.'
+              : `The model was evaluated on these dates — actual counts are shown alongside its prediction.`}</p>
           </section>
 
           <section className="panel">
-            <h2>Forecast table</h2>
-            <div className="table-scroll">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Date</th><th>Total</th><th>General OPD</th><th>Fever</th>
-                    <th>Maternal-child</th><th>Trauma</th><th>Admissions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {forecast.map((f) => (
-                    <tr key={f.date}>
-                      <td>{f.date}</td>
-                      <td><strong>{f.total_patient_arrivals}</strong></td>
-                      <td>{f.general_opd_arrivals}</td>
-                      <td>{f.fever_infectious_arrivals}</td>
-                      <td>{f.maternal_child_arrivals}</td>
-                      <td>{f.trauma_emergency_arrivals}</td>
-                      <td>{f.expected_admissions}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="panel-head">
+              <h2>Model performance</h2>
+              <button className="toggle-link" onClick={loadMetrics}>
+                {showMetrics ? 'Hide ▲' : 'Show comparison ▼'}
+              </button>
             </div>
+            {showMetrics && (
+              metrics ? (
+                <>
+                  <p className="muted small">Test-set metrics per target. Selected model:
+                    <strong> {metrics.selected_family}</strong> (best generalisation).</p>
+                  <div className="table-scroll">
+                    <table className="data-table">
+                      <thead><tr><th>Target</th><th>Model</th><th>R²</th><th>MAE</th><th>RMSE</th><th>WAPE</th></tr></thead>
+                      <tbody>
+                        {metrics.test_metrics.map((m, i) => (
+                          <tr key={i} className={m.model === metrics.selected_family ? 'row-sel' : ''}>
+                            <td>{m.target.replace(/_/g, ' ').replace(' arrivals', '')}</td>
+                            <td>{m.model}</td>
+                            <td>{m.R2.toFixed(3)}</td>
+                            <td>{m.MAE.toFixed(2)}</td>
+                            <td>{m.RMSE.toFixed(2)}</td>
+                            <td>{(m.WAPE * 100).toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : <p className="muted">Loading metrics…</p>
+            )}
           </section>
         </>
       )}

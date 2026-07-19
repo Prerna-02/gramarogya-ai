@@ -197,6 +197,8 @@ class NearbyFacility(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
     facility_type: Mapped[str] = mapped_column(String(24))     # PHC|CHC|Rural Hospital|District Hospital
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     distance_km: Mapped[float] = mapped_column(Float)
     travel_time_min: Mapped[int] = mapped_column(Integer)
     beds_available: Mapped[int] = mapped_column(Integer)

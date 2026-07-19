@@ -43,15 +43,19 @@ RESOURCE_COLS = [
 ]
 
 NEARBY_FACILITIES = [
-    dict(name="CHC Aheri", facility_type="CHC", distance_km=24, travel_time_min=40,
+    dict(name="CHC Aheri", facility_type="CHC", latitude=19.4187, longitude=79.9560,
+         distance_km=24, travel_time_min=40,
          beds_available=18, capabilities="General|Maternity|Basic Emergency", status="Available"),
-    dict(name="PHC Bhamragad", facility_type="PHC", distance_km=35, travel_time_min=70,
+    dict(name="PHC Bhamragad", facility_type="PHC", latitude=19.4330, longitude=80.3520,
+         distance_km=35, travel_time_min=70,
          beds_available=10, capabilities="General|Immunization", status="Available"),
-    dict(name="District Hospital Gadchiroli", facility_type="District Hospital", distance_km=32,
+    dict(name="District Hospital Gadchiroli", facility_type="District Hospital",
+         latitude=20.1836, longitude=80.0028, distance_km=32,
          travel_time_min=55, beds_available=25, capabilities="Surgery|ICU|Trauma|Maternity|Lab|Radiology",
          status="Busy"),
-    dict(name="Rural Hospital Etapalli", facility_type="Rural Hospital", distance_km=35,
-         travel_time_min=65, beds_available=10, capabilities="General|Maternity|Ambulance", status="Limited"),
+    dict(name="Rural Hospital Etapalli", facility_type="Rural Hospital", latitude=19.6970, longitude=80.1030,
+         distance_km=35, travel_time_min=65, beds_available=10,
+         capabilities="General|Maternity|Ambulance", status="Limited"),
 ]
 
 

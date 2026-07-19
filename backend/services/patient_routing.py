@@ -22,6 +22,7 @@ def rank_facilities(db: Session, service: str | None = None, urgency: str | None
         capable = service is None or any(service.lower() in c.lower() for c in caps)
         scored.append({
             "id": f.id, "name": f.name, "type": f.facility_type,
+            "latitude": f.latitude, "longitude": f.longitude,
             "distance_km": f.distance_km, "travel_time_min": f.travel_time_min,
             "beds_available": f.beds_available, "capabilities": caps, "status": f.status,
             "matches_service": capable,

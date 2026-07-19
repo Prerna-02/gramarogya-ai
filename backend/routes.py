@@ -13,7 +13,10 @@ from backend.db import get_db
 from backend.db_models import DailyDemand, NearbyFacility, PlanningRun, ResourceStatus, Staff
 from backend.schemas import ForecastRequest, PlanningRunRequest, TokenResponse
 from backend.services import emergency, llm_summary, patient_routing
-from backend.services.forecasting import ModelNotTrained, backtest_latest, future_forecast, is_ready
+from backend.services.forecasting import (
+    ModelNotTrained, backtest_latest, future_forecast, is_ready, last_data_date,
+    model_metrics as _model_metrics, total_series,
+)
 from backend.services.planning_orchestrator import get_run, run_planning_cycle
 from backend.services.resource_planning import plan_resources
 from backend.services.workforce_optimization import generate_roster
@@ -79,6 +82,30 @@ def forecast_latest(db: Session = Depends(get_db), _=Depends(require_admin)):
     start = _latest(db)
     return {"backtest": backtest_latest(30),
             "future": future_forecast(start, 7)}
+
+
+@router.get("/forecast/series", tags=["forecast"])
+def forecast_series(start: date | None = Query(None), horizon: int = Query(14, ge=1, le=60),
+                    _=Depends(require_admin)):
+    """Total-patient series: actual+predicted for past dates, predicted for future."""
+    if not is_ready():
+        raise HTTPException(503, "Forecast model not trained.")
+    return total_series(start or _default_start(), horizon)
+
+
+@router.get("/forecast/model-metrics", tags=["forecast"])
+def forecast_model_metrics(_=Depends(require_admin)):
+    """Model comparison (Naive/Seasonal/RF/XGBoost) with R2/MAE/RMSE/WAPE."""
+    try:
+        return _model_metrics()
+    except ModelNotTrained as e:
+        raise HTTPException(503, str(e))
+
+
+@router.get("/forecast/bounds", tags=["forecast"])
+def forecast_bounds(_=Depends(require_admin)):
+    """Date range picker bounds for the frontend."""
+    return {"last_data_date": last_data_date().isoformat(), "min_date": "2020-01-15"}
 
 
 # ----------------------------------------------------------------- resources

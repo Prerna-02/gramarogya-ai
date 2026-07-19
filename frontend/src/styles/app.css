@@ -275,3 +275,30 @@ tr.short td { background: #fef2f2; }
 .row-click:hover { background: var(--bg2); }
 .row-sel { background: #eff6ff; }
 .explain { color: var(--ink2); font-size: 0.78rem; max-width: 340px; }
+
+/* ---- Phase 10 polish: toggle, alerts, map ---- */
+.toggle-link { border: none; background: none; color: var(--brand2); cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+
+.switch { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; color: var(--ink2); cursor: pointer; }
+.switch input { display: none; }
+.switch-track { width: 34px; height: 18px; background: #cbd5e1; border-radius: 999px; position: relative; transition: background 0.15s; }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: left 0.15s; }
+.switch input:checked + .switch-track { background: var(--brand2); }
+.switch input:checked + .switch-track .switch-thumb { left: 18px; }
+
+.alert-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto; }
+.alert-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.6rem 0.7rem; border-radius: 9px;
+  background: #f8fafc; border-left: 3px solid var(--muted); }
+.alert-item.high { border-left-color: var(--critical); background: #fef2f2; }
+.alert-item.warn { border-left-color: var(--warn); background: #fffbeb; }
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--warn); flex-shrink: 0; }
+.alert-item.high .alert-dot { background: var(--critical); }
+.alert-title { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+.alert-detail { font-size: 0.78rem; color: var(--ink2); }
+.alert-time { margin-left: auto; font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+
+.map-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.leaflet-container { font: inherit; }
+.map-legend { display: flex; gap: 1.2rem; flex-wrap: wrap; padding: 0.6rem 0.8rem; font-size: 0.78rem; color: var(--ink2); }
+.map-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.map-legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
