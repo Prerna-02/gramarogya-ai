@@ -4,13 +4,14 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.auth import authenticate, create_access_token, require_admin
 from backend.db import get_db
 from backend.db_models import DailyDemand, NearbyFacility, PlanningRun, ResourceStatus, Staff
-from backend.schemas import ForecastRequest, LoginRequest, PlanningRunRequest, TokenResponse
+from backend.schemas import ForecastRequest, PlanningRunRequest, TokenResponse
 from backend.services import emergency, patient_routing
 from backend.services.forecasting import ModelNotTrained, backtest_latest, future_forecast, is_ready
 from backend.services.planning_orchestrator import get_run, run_planning_cycle
@@ -25,8 +26,10 @@ TARGETS = ["total_patient_arrivals", "general_opd_arrivals", "fever_infectious_a
 
 # ----------------------------------------------------------------- auth
 @router.post("/auth/admin/login", response_model=TokenResponse, tags=["auth"])
-def admin_login(body: LoginRequest, db: Session = Depends(get_db)):
-    user = authenticate(db, body.username, body.password)
+def admin_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """OAuth2 password flow (form-encoded). Powers Swagger's Authorize button and
+    the frontend login. Leave client_id/client_secret blank."""
+    user = authenticate(db, form.username, form.password)
     if user is None:
         raise HTTPException(401, "Invalid username or password")
     return TokenResponse(access_token=create_access_token(user.username, user.role),

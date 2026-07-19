@@ -52,14 +52,14 @@ def admin_token():
             db.add(User(username=TEST_ADMIN[0], password_hash=hash_password(TEST_ADMIN[1]),
                         role="administrator"))
             db.commit()
-    resp = client.post("/api/auth/admin/login", json={"username": TEST_ADMIN[0], "password": TEST_ADMIN[1]})
+    resp = client.post("/api/auth/admin/login", data={"username": TEST_ADMIN[0], "password": TEST_ADMIN[1]})
     assert resp.status_code == 200
     return resp.json()["access_token"]
 
 
 @needs_db
 def test_login_wrong_password_401():
-    r = client.post("/api/auth/admin/login", json={"username": TEST_ADMIN[0], "password": "nope"})
+    r = client.post("/api/auth/admin/login", data={"username": TEST_ADMIN[0], "password": "nope"})
     assert r.status_code == 401
 
 
