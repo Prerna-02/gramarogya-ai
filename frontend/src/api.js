@@ -55,9 +55,13 @@ export const api = {
   forecastLatest: () => request('/api/forecast/latest'),
   forecastRun: (horizon_days = 7) =>
     request('/api/forecast/run', { method: 'POST', body: { horizon_days } }),
-  forecastSeries: (start, horizon = 14) =>
-    request(`/api/forecast/series?start=${start}&horizon=${horizon}`),
+  forecastSeries: (start, horizon = 14, context_days = 0) => {
+    const q = new URLSearchParams({ horizon, context_days })
+    if (start) q.set('start', start)
+    return request(`/api/forecast/series?${q}`)
+  },
   forecastBounds: () => request('/api/forecast/bounds'),
+  forecastPatterns: () => request('/api/forecast/patterns'),
   modelMetrics: () => request('/api/forecast/model-metrics'),
   resourcesPlan: (horizon_days = 7) =>
     request('/api/resources/plan', { method: 'POST', body: { horizon_days } }),

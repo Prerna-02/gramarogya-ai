@@ -15,7 +15,7 @@ from backend.schemas import ForecastRequest, PlanningRunRequest, TokenResponse
 from backend.services import emergency, llm_summary, patient_routing
 from backend.services.forecasting import (
     ModelNotTrained, backtest_latest, future_forecast, is_ready, last_data_date,
-    model_metrics as _model_metrics, total_series,
+    model_metrics as _model_metrics, patterns as _patterns, total_series,
 )
 from backend.services.planning_orchestrator import get_run, run_planning_cycle
 from backend.services.resource_planning import plan_resources
@@ -86,11 +86,20 @@ def forecast_latest(db: Session = Depends(get_db), _=Depends(require_admin)):
 
 @router.get("/forecast/series", tags=["forecast"])
 def forecast_series(start: date | None = Query(None), horizon: int = Query(14, ge=1, le=60),
-                    _=Depends(require_admin)):
-    """Total-patient series: actual+predicted for past dates, predicted for future."""
+                    context_days: int = Query(0, ge=0, le=30), _=Depends(require_admin)):
+    """Total-patient series with per-category forecasts and an uncertainty band.
+    Past dates carry actual+predicted; future dates carry predicted + [lower, upper]."""
     if not is_ready():
         raise HTTPException(503, "Forecast model not trained.")
-    return total_series(start or _default_start(), horizon)
+    return total_series(start or _default_start(), horizon, context_days)
+
+
+@router.get("/forecast/patterns", tags=["forecast"])
+def forecast_patterns(_=Depends(require_admin)):
+    """Average arrivals by day-of-week and by month (for the pattern charts)."""
+    if not is_ready():
+        raise HTTPException(503, "Forecast model not trained.")
+    return _patterns()
 
 
 @router.get("/forecast/model-metrics", tags=["forecast"])

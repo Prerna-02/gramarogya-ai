@@ -302,3 +302,8 @@ tr.short td { background: #fef2f2; }
 .map-legend { display: flex; gap: 1.2rem; flex-wrap: wrap; padding: 0.6rem 0.8rem; font-size: 0.78rem; color: var(--ink2); }
 .map-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
 .map-legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+/* Custom chart tooltip */
+.chart-tip { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.7rem; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.chart-tip .tip-date { color: var(--ink2); font-weight: 600; margin-bottom: 2px; }
+.chart-tip .tip-range { color: #2563eb; }

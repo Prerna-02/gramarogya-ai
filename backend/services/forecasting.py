@@ -124,12 +124,32 @@ def last_data_date() -> date:
     return _history()["date"].max().date()
 
 
-def total_series(start, horizon: int) -> dict:
-    """Total-patient series from `start` for `horizon` days.
+CATEGORY_TARGETS = ["general_opd_arrivals", "fever_infectious_arrivals",
+                    "maternal_child_arrivals", "trauma_emergency_arrivals"]
+BAND_Z = 1.2816  # ~80% interval
 
-    For dates within the historical data: returns actual + model prediction
-    (the model was trained/tested, so we can show both). For future dates:
-    returns the forecast (predicted only, actual = null).
+
+@lru_cache(maxsize=1)
+def _residual_std() -> float:
+    """Std of the model's total-arrivals residuals on the 2025 test window."""
+    bundle, config = _load()
+    hist = _history().copy()
+    hist["season_enc"] = hist["season"].map(config["season_map"])
+    hist["outbreak_type_enc"] = hist["outbreak_type"].fillna("None").map(config["outbreak_map"])
+    heng = hist.dropna(subset=config["features"])
+    test = heng[heng["date"] > "2024-12-31"]
+    if test.empty:
+        test = heng.tail(200)
+    pred = bundle["models"]["total_patient_arrivals"].predict(test[config["features"]].astype(float))
+    return float(np.std(test["total_patient_arrivals"].to_numpy() - pred))
+
+
+def total_series(start, horizon: int, context_days: int = 0) -> dict:
+    """Total-patient series with per-category forecasts and an uncertainty band.
+
+    Past dates: actual + model prediction. Future dates: forecast with an
+    empirical +/- band (from backtest residuals) that widens with horizon.
+    `context_days` prepends that many recent actual days before `start`.
     """
     bundle, config = _load()
     hist = _history().copy()
@@ -137,28 +157,65 @@ def total_series(start, horizon: int) -> dict:
     hist["outbreak_type_enc"] = hist["outbreak_type"].fillna("None").map(config["outbreak_map"])
     heng = hist.dropna(subset=config["features"]).copy()
     heng.index = heng["date"].dt.date
-    model = bundle["models"]["total_patient_arrivals"]
+    models = bundle["models"]
+    feats = config["features"]
     last = hist["date"].max().date()
+    sigma = _residual_std()
 
     if isinstance(start, str):
         start = datetime.strptime(start, "%Y-%m-%d").date()
-    dates = [start + timedelta(days=i) for i in range(horizon)]
-    out = []
-    fut = [d for d in dates if d > last]
-    for d in dates:
-        if d <= last:
-            if d in heng.index:
-                X = heng.loc[[d], config["features"]].astype(float)
-                out.append({"date": d.isoformat(), "actual": int(heng.loc[d, "total_patient_arrivals"]),
-                            "predicted": round(float(model.predict(X)[0]), 1)})
-            else:  # before the series warm-up window
-                out.append({"date": d.isoformat(), "actual": None, "predicted": None})
+    ctx = [start - timedelta(days=i) for i in range(context_days, 0, -1)]
+    window = [start + timedelta(days=i) for i in range(horizon)]
+    all_dates = ctx + window
+    fut = [d for d in all_dates if d > last]
+
+    rows = []
+    for d in all_dates:
+        if d > last:
+            continue
+        e = {"date": d.isoformat(), "kind": "context" if d in ctx else "window",
+             "actual": None, "predicted": None, "lower": None, "upper": None, "band": None, "cat": None}
+        if d in heng.index:
+            X = heng.loc[[d], feats].astype(float)
+            e["actual"] = int(heng.loc[d, "total_patient_arrivals"])
+            e["predicted"] = round(float(models["total_patient_arrivals"].predict(X)[0]), 1)
+            e["cat"] = {c: max(0, round(float(models[c].predict(X)[0]))) for c in CATEGORY_TARGETS}
+        rows.append(e)
+
     if fut:
-        for f in future_forecast(fut[0], len(fut)):
-            out.append({"date": f["date"], "actual": None, "predicted": f["total_patient_arrivals"]})
-    out.sort(key=lambda r: r["date"])
-    return {"start": start.isoformat(), "horizon": horizon,
-            "is_future": start > last, "last_data_date": last.isoformat(), "series": out}
+        for h, f in enumerate(future_forecast(fut[0], len(fut)), start=1):
+            hw = round(BAND_Z * sigma * (1 + 0.10 * (h - 1)), 1)
+            p = f["total_patient_arrivals"]
+            lo, hi = max(0, round(p - hw)), round(p + hw)
+            in_window = datetime.strptime(f["date"], "%Y-%m-%d").date() in window
+            rows.append({"date": f["date"], "kind": "window" if in_window else "context",
+                         "actual": None, "predicted": p, "lower": lo, "upper": hi, "band": [lo, hi],
+                         "cat": {c: f[c] for c in CATEGORY_TARGETS}})
+
+    rows.sort(key=lambda r: r["date"])
+    win = [r for r in rows if r["kind"] == "window" and (r["actual"] is not None or r["predicted"] is not None)]
+    vals = [(r["actual"] if r["actual"] is not None else r["predicted"]) for r in win]
+    peak = max(win, key=lambda r: (r["actual"] if r["actual"] is not None else r["predicted"])) if win else None
+    return {
+        "start": start.isoformat(), "horizon": horizon, "is_future": start > last,
+        "last_data_date": last.isoformat(), "band_pct": 80, "series": rows,
+        "avg": round(sum(vals) / len(vals)) if vals else None,
+        "peak": {"date": peak["date"], "value": peak["actual"] if peak["actual"] is not None else peak["predicted"]} if peak else None,
+        "total": round(sum(vals)) if vals else None,
+    }
+
+
+def patterns() -> dict:
+    """Average total arrivals by day-of-week and by month (from history)."""
+    import calendar
+    hist = _history()
+    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    weekly = hist.groupby("day_of_week")["total_patient_arrivals"].mean().reindex(order)
+    monthly = hist.groupby(hist["date"].dt.month)["total_patient_arrivals"].mean()
+    return {
+        "weekly": [{"day": d[:3], "avg": round(float(v), 1)} for d, v in weekly.items()],
+        "monthly": [{"month": calendar.month_abbr[int(m)], "avg": round(float(v), 1)} for m, v in monthly.items()],
+    }
 
 
 def model_metrics() -> dict:

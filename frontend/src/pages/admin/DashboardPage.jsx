@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api.js'
 import ActiveAlerts from '../../components/ActiveAlerts.jsx'
 import DepartmentDonut from '../../components/DepartmentDonut.jsx'
-import ForecastChart from '../../components/ForecastChart.jsx'
+import InflowChart from '../../components/InflowChart.jsx'
 import MetricCard from '../../components/MetricCard.jsx'
 
 const RISK_TONE = { Normal: 'good', Watch: 'warn', High: 'serious', Critical: 'critical' }
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState(null)
+  const [inflow, setInflow] = useState(null)
   const [explain, setExplain] = useState(null)
   const [error, setError] = useState('')
   const [run, setRun] = useState(null)
@@ -17,6 +18,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     api.dashboardSummary().then(setSummary).catch((e) => setError(e.message))
+    api.forecastSeries(null, 7, 7).then(setInflow).catch(() => {})   // next 7 days + 7 days context
     api.dashboardExplain().then(setExplain).catch(() => {})
   }, [])
 
@@ -73,9 +75,9 @@ export default function DashboardPage() {
 
       <div className="grid-2">
         <section className="panel">
-          <h2>Predicted vs Actual patients</h2>
-          <p className="muted small">Backtest on the most recent unseen days (XGBoost).</p>
-          <ForecastChart data={summary.backtest} />
+          <h2>Patient inflow — next 7 days</h2>
+          <p className="muted small">Forecast with an ~80% expected range (shaded). Recent actuals shown for context.</p>
+          {inflow ? <InflowChart data={inflow.series} avg={inflow.avg} /> : <p className="muted">Loading…</p>}
         </section>
         <section className="panel">
           <h2>Department-wise load (next day)</h2>
