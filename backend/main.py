@@ -32,6 +32,6 @@ def health() -> dict:
     return {"status": "ok", "app": "gramarogya-ai", "version": app.version}
 
 
-# Routers are registered in later phases (see backend/routes.py).
-# from backend.routes import router
-# app.include_router(router)
+from backend.routes import router  # noqa: E402
+
+app.include_router(router)
