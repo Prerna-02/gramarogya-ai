@@ -1,7 +1,4 @@
-"""PostgreSQL connection and SQLAlchemy session management.
-
-Implemented in Phase 4 (Create the PostgreSQL Database).
-"""
+"""PostgreSQL connection and SQLAlchemy session management (Phase 4)."""
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
