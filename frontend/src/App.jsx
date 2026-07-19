@@ -4,7 +4,11 @@ import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import DashboardPage from './pages/admin/DashboardPage.jsx'
-import ComingSoonPage from './pages/admin/ComingSoonPage.jsx'
+import ForecastPage from './pages/admin/ForecastPage.jsx'
+import ResourcePlanPage from './pages/admin/ResourcePlanPage.jsx'
+import WorkforcePage from './pages/admin/WorkforcePage.jsx'
+import EmergencyPage from './pages/admin/EmergencyPage.jsx'
+import FairnessPage from './pages/admin/FairnessPage.jsx'
 import PatientHomePage from './pages/patient/PatientHomePage.jsx'
 
 // One React app, role-based layouts:
@@ -27,11 +31,11 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="forecast" element={<ComingSoonPage title="Demand Forecast" />} />
-        <Route path="resources" element={<ComingSoonPage title="Resource Planning" />} />
-        <Route path="workforce" element={<ComingSoonPage title="Workforce Roster" />} />
-        <Route path="emergency" element={<ComingSoonPage title="Emergency Network" />} />
-        <Route path="fairness" element={<ComingSoonPage title="Fairness & Audit" />} />
+        <Route path="forecast" element={<ForecastPage />} />
+        <Route path="resources" element={<ResourcePlanPage />} />
+        <Route path="workforce" element={<WorkforcePage />} />
+        <Route path="emergency" element={<EmergencyPage />} />
+        <Route path="fairness" element={<FairnessPage />} />
       </Route>
 
       <Route path="/patient" element={<Layout role="patient" />}>

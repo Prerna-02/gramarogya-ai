@@ -73,12 +73,7 @@ export default function DashboardPage() {
         <section className="panel">
           <h2>AI Recommendation Explanation</h2>
           {explain ? (
-            <>
-              <p className="ai-summary">{explain.summary}</p>
-              <span className={`source-badge ${explain.source}`}>
-                {explain.source === 'llm' ? `AI (${explain.model})` : 'Rule-based'}
-              </span>
-            </>
+            <p className="ai-summary">{explain.summary}</p>
           ) : (
             <p className="muted">Generating summary…</p>
           )}

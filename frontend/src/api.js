@@ -53,4 +53,14 @@ export const api = {
   createPlanningRun: (horizon_days = 7) =>
     request('/api/planning-runs', { method: 'POST', body: { horizon_days } }),
   forecastLatest: () => request('/api/forecast/latest'),
+  forecastRun: (horizon_days = 7) =>
+    request('/api/forecast/run', { method: 'POST', body: { horizon_days } }),
+  resourcesPlan: (horizon_days = 7) =>
+    request('/api/resources/plan', { method: 'POST', body: { horizon_days } }),
+  workforceGenerate: (roster_horizon_days = 7) =>
+    request('/api/workforce/generate', { method: 'POST', body: { horizon_days: roster_horizon_days, roster_horizon_days } }),
+  emergencyCheck: (horizon_days = 7) =>
+    request('/api/emergency/check', { method: 'POST', body: { horizon_days } }),
+  facilities: () => request('/api/patient/facilities', { auth: false }),
 }
+
