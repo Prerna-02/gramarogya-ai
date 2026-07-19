@@ -1,23 +1,37 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 
 import Layout from './components/Layout.jsx'
-import LandingPage from './pages/LandingPage.jsx'
+import ProtectedRoute from './components/ProtectedRoute.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import DashboardPage from './pages/admin/DashboardPage.jsx'
+import ComingSoonPage from './pages/admin/ComingSoonPage.jsx'
 import PatientHomePage from './pages/patient/PatientHomePage.jsx'
 
-// One React application serves both audiences through role-based layouts:
-//   /admin/*   -> Hospital administration portal
-//   /patient/* -> Patient / public interface
-// The full set of pages is built in Phases 10-11; Phase 2 wires the skeleton.
+// One React app, role-based layouts:
+//   /admin/*   -> Hospital administration portal (auth required)
+//   /patient/* -> Patient / public interface (guest)
+// Phase 10 delivers the admin foundation + Overview dashboard; the remaining
+// admin pages are stubbed with ComingSoonPage and filled in next.
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Navigate to="/admin" replace />} />
       <Route path="/login" element={<LoginPage />} />
 
-      <Route path="/admin" element={<Layout role="admin" />}>
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <Layout role="admin" />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<DashboardPage />} />
+        <Route path="forecast" element={<ComingSoonPage title="Demand Forecast" />} />
+        <Route path="resources" element={<ComingSoonPage title="Resource Planning" />} />
+        <Route path="workforce" element={<ComingSoonPage title="Workforce Roster" />} />
+        <Route path="emergency" element={<ComingSoonPage title="Emergency Network" />} />
+        <Route path="fairness" element={<ComingSoonPage title="Fairness & Audit" />} />
       </Route>
 
       <Route path="/patient" element={<Layout role="patient" />}>

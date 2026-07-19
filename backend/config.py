@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     app_env: str = "development"
 
+    # Optional LLM narrative summaries (Groq / Llama). Blank -> rule-based fallback.
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

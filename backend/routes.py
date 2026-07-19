@@ -12,7 +12,7 @@ from backend.auth import authenticate, create_access_token, require_admin
 from backend.db import get_db
 from backend.db_models import DailyDemand, NearbyFacility, PlanningRun, ResourceStatus, Staff
 from backend.schemas import ForecastRequest, PlanningRunRequest, TokenResponse
-from backend.services import emergency, patient_routing
+from backend.services import emergency, llm_summary, patient_routing
 from backend.services.forecasting import ModelNotTrained, backtest_latest, future_forecast, is_ready
 from backend.services.planning_orchestrator import get_run, run_planning_cycle
 from backend.services.resource_planning import plan_resources
@@ -138,6 +138,31 @@ def dashboard_summary(db: Session = Depends(get_db), _=Depends(require_admin)):
             "available_general_beds": latest_res.available_general_beds,
             "resource_shortage_count": latest_res.resource_shortage_count}
     return out
+
+
+@router.get("/dashboard/explain", tags=["dashboard"])
+def dashboard_explain(_=Depends(require_admin)):
+    """Plain-language briefing of the outlook (LLM if configured, else rule-based)."""
+    if not is_ready():
+        raise HTTPException(503, "Forecast model not trained.")
+    start = _default_start()
+    forecast = future_forecast(start, 7)
+    cap = emergency.check_capacity(start, 7)
+    totals = [f["total_patient_arrivals"] for f in forecast]
+    shortage_counter: dict[str, int] = {}
+    for d in cap["days"]:
+        for s in d["shortages"]:
+            shortage_counter[s] = shortage_counter.get(s, 0) + 1
+    top = sorted(shortage_counter, key=shortage_counter.get, reverse=True)[:4]
+    context = {
+        "period": f"{forecast[0]['date']} to {forecast[-1]['date']}",
+        "avg_total": round(sum(totals) / len(totals)),
+        "peak_total": max(totals),
+        "overall_risk": cap["overall_risk"],
+        "overload_days": cap["overload_days"],
+        "top_shortages": top,
+    }
+    return {**llm_summary.summarize(context), "context": context}
 
 
 # ----------------------------------------------------------------- patient (guest, no auth)
