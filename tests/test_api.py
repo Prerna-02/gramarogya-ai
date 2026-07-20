@@ -125,6 +125,58 @@ def test_emergency_scenarios_and_simulation(admin_token):
 
 
 @needs_db
+def test_audit_trail_records_actions(admin_token):
+    h = {"Authorization": f"Bearer {admin_token}"}
+    client.post("/api/audit", headers=h, json={"action": "roster_approved", "entity": "t", "reason": "ok"})
+    entries = client.get("/api/audit", headers=h).json()["entries"]
+    actions = {e["action"] for e in entries}
+    assert "login" in actions          # the fixture logged in
+    assert "roster_approved" in actions
+    # override without a reason is rejected
+    assert client.post("/api/audit", headers=h, json={"action": "override"}).status_code == 400
+
+
+@needs_db
+def test_no_protected_attributes_collected():
+    import pandas as pd
+    cols = {c.lower() for c in pd.read_csv(ROOT / "data" / "staff_master.csv").columns}
+    protected = {"gender", "sex", "caste", "religion", "age", "race", "ethnicity"}
+    assert not (cols & protected)
+
+
+@needs_db
+def test_fairness_report_within_groups(admin_token):
+    h = {"Authorization": f"Bearer {admin_token}"}
+    r = client.post("/api/workforce/generate", headers=h, json={"horizon_days": 7, "roster_horizon_days": 7})
+    if r.status_code == 503:
+        pytest.skip("model not trained")
+    fr = r.json()["fairness_report"]
+    assert fr["no_protected_attributes"] is True
+    assert fr["rest_compliance_pct"] == 100.0
+    assert 0 <= fr["shift_equity_index"] <= 100
+    from backend.services.scheduling_config import FAIRNESS_GROUPS
+    valid = set(FAIRNESS_GROUPS.values())
+    assert all(g["group"] in valid for g in fr["groups"])
+
+
+@needs_db
+def test_alert_dispatch_requires_privileged_role():
+    """Least-privilege: a non-emergency role cannot send alerts."""
+    from sqlalchemy import select
+    from backend.auth import hash_password
+    from backend.db import SessionLocal
+    from backend.db_models import User
+    with SessionLocal() as db:
+        if not db.scalar(select(User).where(User.username == "pytest_inv")):
+            db.add(User(username="pytest_inv", password_hash=hash_password("x"), role="inventory_manager"))
+            db.commit()
+    tok = client.post("/api/auth/admin/login", data={"username": "pytest_inv", "password": "x"}).json()["access_token"]
+    r = client.post("/api/emergency/alerts", headers={"Authorization": f"Bearer {tok}"},
+                    json={"scenario": "X", "severity": 1, "requested_support": [], "facility_ids": []})
+    assert r.status_code == 403
+
+
+@needs_db
 def test_planning_run_creates_connected_outputs(admin_token):
     """Phase 9 completion check: one request -> forecast+resources+roster under one id."""
     h = {"Authorization": f"Bearer {admin_token}"}

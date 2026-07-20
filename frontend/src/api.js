@@ -73,6 +73,11 @@ export const api = {
   emergencySimulate: (scenario_id, severity, horizon_days = 7) =>
     request('/api/emergency/simulate', { method: 'POST', body: { scenario_id, severity, horizon_days } }),
   emergencySendAlert: (body) => request('/api/emergency/alerts', { method: 'POST', body }),
+  auditLog: () => request('/api/audit'),
+  auditActivity: () => request('/api/audit/activity'),
+  auditAction: (body) => request('/api/audit', { method: 'POST', body }),
+  systemStatus: () => request('/api/system/status'),
+  modelInfo: () => request('/api/system/model-info'),
   facilities: (service) =>
     request(`/api/patient/facilities${service ? `?service=${encodeURIComponent(service)}` : ''}`, { auth: false }),
   facilityDetail: (id) => request(`/api/patient/facilities/${id}`, { auth: false }),

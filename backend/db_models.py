@@ -16,6 +16,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.db import Base
 
 
+# ------------------------------------------------------------------ audit
+class AuditLog(Base):
+    """Who did what, when. Records automated decisions and human overrides."""
+    __tablename__ = "audit_log"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    user: Mapped[str] = mapped_column(String(80), default="system")
+    action: Mapped[str] = mapped_column(String(60), index=True)   # login|planning_run|roster_approved|override|alert_sent
+    entity: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
 # ------------------------------------------------------------------ auth
 class User(Base):
     __tablename__ = "users"

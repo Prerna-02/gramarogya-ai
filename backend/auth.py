@@ -67,3 +67,10 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role not in ("administrator", "roster_manager", "emergency_officer", "inventory_manager"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required")
     return user
+
+
+def require_emergency_officer(user: User = Depends(get_current_user)) -> User:
+    """Least-privilege: only an administrator or emergency officer may send alerts."""
+    if user.role not in ("administrator", "emergency_officer"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Emergency-officer access required to send alerts")
+    return user

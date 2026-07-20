@@ -8,16 +8,18 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.auth import authenticate, create_access_token, require_admin
-from backend.db import get_db
+from backend.auth import authenticate, create_access_token, require_admin, require_emergency_officer
+from backend.config import settings
+from backend.db import engine, get_db
 from backend.db_models import DailyDemand, NearbyFacility, PlanningRun, ResourceStatus, Staff
 from backend.schemas import (
-    ForecastRequest, PlanningRunRequest, SendAlertRequest, SimulateRequest, TokenResponse,
+    AuditActionRequest, ForecastRequest, PlanningRunRequest, SendAlertRequest, SimulateRequest,
+    TokenResponse,
 )
-from backend.services import emergency, llm_summary, patient_routing
+from backend.services import audit, emergency, llm_summary, patient_routing
 from backend.services.forecasting import (
     ModelNotTrained, backtest_latest, future_forecast, is_ready, last_data_date,
-    model_metrics as _model_metrics, patterns as _patterns, total_series,
+    model_info as _model_info, model_metrics as _model_metrics, patterns as _patterns, total_series,
 )
 from backend.services.planning_orchestrator import get_run, run_planning_cycle
 from backend.services.resource_planning import plan_resources
@@ -37,6 +39,7 @@ def admin_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
     user = authenticate(db, form.username, form.password)
     if user is None:
         raise HTTPException(401, "Invalid username or password")
+    audit.record(db, user.username, "login")
     return TokenResponse(access_token=create_access_token(user.username, user.role),
                          role=user.role, username=user.username)
 
@@ -44,11 +47,14 @@ def admin_login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
 # ----------------------------------------------------------------- planning runs
 @router.post("/planning-runs", tags=["planning"])
 def create_planning_run(body: PlanningRunRequest, db: Session = Depends(get_db),
-                        _=Depends(require_admin)):
+                        user=Depends(require_admin)):
     if not is_ready():
         raise HTTPException(503, "Forecast model not trained. Run scripts/train_forecast_model.py.")
     try:
-        return run_planning_cycle(db, body.start_date, body.horizon_days, body.roster_horizon_days)
+        result = run_planning_cycle(db, body.start_date, body.horizon_days, body.roster_horizon_days)
+        audit.record(db, user.username, "planning_run", entity=result["planning_run_id"],
+                     detail=f"horizon {body.horizon_days}d")
+        return result
     except ModelNotTrained as e:
         raise HTTPException(503, str(e))
 
@@ -167,14 +173,18 @@ def emergency_simulate(body: SimulateRequest, db: Session = Depends(get_db), _=D
 
 
 @router.post("/emergency/alerts", tags=["emergency"])
-def emergency_send_alert(body: SendAlertRequest, db: Session = Depends(get_db), _=Depends(require_admin)):
-    """Persist an approved alert as 'sent' (human-approved). Facility responses
-    are simulated in the prototype UI."""
+def emergency_send_alert(body: SendAlertRequest, db: Session = Depends(get_db),
+                         user=Depends(require_emergency_officer)):
+    """Persist an approved alert as 'sent' (human-approved, least-privilege). Facility
+    responses are simulated in the prototype UI."""
     from backend.db_models import EmergencyAlert
     alert = EmergencyAlert(scenario=body.scenario, severity=body.severity,
                            requested_support=", ".join(body.requested_support), status="sent")
     db.add(alert)
     db.commit()
+    audit.record(db, user.username, "alert_sent", entity=body.scenario,
+                 detail=f"severity {body.severity}; facilities {body.facility_ids}",
+                 reason="human-approved emergency dispatch")
     return {"alert_id": alert.id, "status": "sent", "scenario": body.scenario,
             "notified_facilities": body.facility_ids}
 
@@ -230,6 +240,49 @@ def dashboard_explain(_=Depends(require_admin)):
         "top_shortages": top,
     }
     return {**llm_summary.summarize(context), "context": context}
+
+
+# ----------------------------------------------------------------- governance / audit
+@router.get("/audit", tags=["governance"])
+def audit_log(limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db), _=Depends(require_admin)):
+    return {"entries": audit.recent(db, limit)}
+
+
+@router.get("/audit/activity", tags=["governance"])
+def audit_activity(db: Session = Depends(get_db), _=Depends(require_admin)):
+    return {"activity": audit.activity(db)}
+
+
+@router.post("/audit", tags=["governance"])
+def audit_action(body: AuditActionRequest, db: Session = Depends(get_db), user=Depends(require_admin)):
+    """Record a human approval / override (reason required for overrides)."""
+    if body.action == "override" and not body.reason:
+        raise HTTPException(400, "override requires a reason")
+    audit.record(db, user.username, body.action, entity=body.entity, reason=body.reason)
+    return {"recorded": True}
+
+
+@router.get("/system/status", tags=["governance"])
+def system_status(_=Depends(require_admin)):
+    """Component health for graceful-degradation transparency."""
+    db_ok = True
+    try:
+        from sqlalchemy import text
+        with engine.connect() as c:
+            c.execute(text("SELECT 1"))
+    except Exception:  # noqa: BLE001
+        db_ok = False
+    return {"model_ready": is_ready(), "database_connected": db_ok,
+            "llm_configured": bool(settings.groq_api_key),
+            "last_data_date": last_data_date().isoformat() if is_ready() else None}
+
+
+@router.get("/system/model-info", tags=["governance"])
+def system_model_info(_=Depends(require_admin)):
+    try:
+        return _model_info()
+    except ModelNotTrained as e:
+        raise HTTPException(503, str(e))
 
 
 # ----------------------------------------------------------------- patient (guest, no auth)

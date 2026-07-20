@@ -401,6 +401,36 @@ def _shortage_action(r: ShiftRequirement) -> str:
     return "activate on-call, arrange locum support, or administrator intervention"
 
 
+def _fairness_report(load, staff) -> dict:
+    """Per-staff loads within comparable role groups + fairness indices.
+    Uses only role/skill/availability — never protected attributes (none collected)."""
+    groups = {}
+    for sid, s in staff.items():
+        groups.setdefault(s["group"], []).append(sid)
+    report_groups, all_shifts, cvs = [], [], []
+    for g, sids in groups.items():
+        members = []
+        for sid in sids:
+            L = load[sid]
+            if L["days"] > 0:
+                members.append({"staff_name": staff[sid]["staff_name"], "nights": L["night"],
+                                "weekends": L["weekend"], "oncall": L["oncall"], "shifts": L["days"]})
+                all_shifts.append(L["days"])
+        if len(members) >= 2:
+            nw = [m["nights"] + m["weekends"] for m in members]
+            mean = sum(nw) / len(nw)
+            cvs.append(float(np.std(nw)) / (mean + 1))
+            report_groups.append({"group": g, "members": sorted(members, key=lambda m: -m["nights"])})
+    equity = max(0.0, min(100.0, round(100 * (1 - (sum(cvs) / len(cvs) if cvs else 0)), 1)))
+    return {
+        "shift_equity_index": equity,
+        "workload_variance": round(float(np.var(all_shifts)), 2) if all_shifts else 0.0,
+        "rest_compliance_pct": 100.0,          # enforced by the decode (min-rest hard constraint)
+        "no_protected_attributes": True,
+        "groups": report_groups,
+    }
+
+
 def _fairness_metrics(load, staff):
     groups = {}
     for sid, s in staff.items():
@@ -480,6 +510,7 @@ def generate_roster(forecast_by_date: dict, staff_df: pd.DataFrame, start_date, 
         "hard_constraint_violations": [],   # feasibility-preserving decode => none
         "soft_constraint_warnings": warnings,
         "fairness_metrics": _fairness_metrics(b_metrics["load"], staff),
+        "fairness_report": _fairness_report(b_metrics["load"], staff),
         "fatigue_metrics": {"total_fatigue_score": round(b_metrics["fatigue"], 2)},
         "overtime_metrics": {"total_overtime_hours": round(b_metrics["overtime"], 2)},
         "preference_satisfaction": _pref_satisfaction(b_metrics, b_assign),

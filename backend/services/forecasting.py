@@ -223,3 +223,21 @@ def model_metrics() -> dict:
     if not path.exists():
         raise ModelNotTrained("Model metrics not found. Run scripts/train_forecast_model.py.")
     return json.loads(path.read_text())
+
+
+def model_info() -> dict:
+    """Traceability: which model, its headline metrics, and when it was trained."""
+    from datetime import datetime as _dt
+    _, config = _load()
+    total = {x["model"]: x for x in model_metrics()["test_metrics"] if x["target"] == "total_patient_arrivals"}
+    sel = total.get(config["selected_family"])
+    mp = ARTIFACTS / "demand_model.joblib"
+    return {
+        "selected_model": config["selected_family"],
+        "n_features": len(config["features"]),
+        "n_targets": len(config["targets"]),
+        "split": config["split"],
+        "trained_at": _dt.fromtimestamp(mp.stat().st_mtime).isoformat() if mp.exists() else None,
+        "total_r2": round(sel["R2"], 3) if sel else None,
+        "total_wape_pct": round(sel["WAPE"] * 100, 1) if sel else None,
+    }

@@ -53,3 +53,10 @@ class SendAlertRequest(BaseModel):
     severity: int = Field(3, ge=1, le=5)
     requested_support: list[str] = []
     facility_ids: list[int] = []
+
+
+# ---- governance / audit ----
+class AuditActionRequest(BaseModel):
+    action: str                      # e.g. roster_approved, override
+    entity: str | None = None
+    reason: str | None = None

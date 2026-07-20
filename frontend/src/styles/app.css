@@ -363,3 +363,13 @@ tr.short td { background: #fef2f2; }
 .leaflet-container path.leaflet-interactive { transition: stroke 0.3s; }
 
 .scen-ex { font-size: 0.66rem; color: var(--muted); text-align: center; line-height: 1.3; }
+
+/* ---- Phase 13: governance ---- */
+.status-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.sb { font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: 999px; background: #f1f5f9; color: var(--ink2); }
+.sb.ok { background: #dcfce7; color: #166534; } .sb.bad { background: #fee2e2; color: #b91c1c; }
+.sb.warn { background: #fef3c7; color: #b45309; } .sb.neutral { background: #eef2ff; color: #3730a3; }
+.govern-note { background: #f0fdf4; border-left: 3px solid #16a34a; color: #14532d; padding: 0.55rem 0.75rem; border-radius: 8px; font-size: 0.8rem; margin: 0.6rem 0; }
+.govern-list { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.govern-list li { font-size: 0.82rem; color: var(--ink2); line-height: 1.5; }
+.govern-list b { color: var(--ink); }
