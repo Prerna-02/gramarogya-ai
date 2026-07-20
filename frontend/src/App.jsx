@@ -9,7 +9,11 @@ import ResourcePlanPage from './pages/admin/ResourcePlanPage.jsx'
 import WorkforcePage from './pages/admin/WorkforcePage.jsx'
 import EmergencyPage from './pages/admin/EmergencyPage.jsx'
 import FairnessPage from './pages/admin/FairnessPage.jsx'
+import PatientLayout from './components/PatientLayout.jsx'
 import PatientHomePage from './pages/patient/PatientHomePage.jsx'
+import FacilitySearchPage from './pages/patient/FacilitySearchPage.jsx'
+import FacilityDetailsPage from './pages/patient/FacilityDetailsPage.jsx'
+import PatientEmergencyPage from './pages/patient/PatientEmergencyPage.jsx'
 
 // One React app, role-based layouts:
 //   /admin/*   -> Hospital administration portal (auth required)
@@ -38,8 +42,11 @@ export default function App() {
         <Route path="fairness" element={<FairnessPage />} />
       </Route>
 
-      <Route path="/patient" element={<Layout role="patient" />}>
+      <Route path="/patient" element={<PatientLayout />}>
         <Route index element={<PatientHomePage />} />
+        <Route path="search" element={<FacilitySearchPage />} />
+        <Route path="facility/:id" element={<FacilityDetailsPage />} />
+        <Route path="emergency" element={<PatientEmergencyPage />} />
       </Route>
     </Routes>
   )

@@ -216,6 +216,12 @@ def patient_facility_detail(facility_id: int, db: Session = Depends(get_db)):
     return detail
 
 
+@router.get("/patient/outbreak-alert", tags=["patient"])
+def patient_outbreak_alert(db: Session = Depends(get_db)):
+    """Public outbreak advisory (guest). No diagnosis; guidance only."""
+    return patient_routing.outbreak_alert(db)
+
+
 # ----------------------------------------------------------------- helpers
 def _latest(db: Session) -> date:
     d = db.scalar(select(DailyDemand.date).order_by(DailyDemand.date.desc()).limit(1))
