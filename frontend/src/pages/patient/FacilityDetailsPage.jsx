@@ -16,7 +16,9 @@ export default function FacilityDetailsPage() {
   if (error) return <div className="pt-page"><p className="pt-muted">{error}</p></div>
   if (!f) return <div className="pt-page"><p className="pt-muted">…</p></div>
 
-  const maps = `https://www.openstreetmap.org/?mlat=${f.latitude}&mlon=${f.longitude}#map=13/${f.latitude}/${f.longitude}`
+  // Search the map by NAME so the provider's verified geocoding places it,
+  // rather than relying on approximate prototype coordinates.
+  const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ', Gadchiroli, Maharashtra')}`
 
   return (
     <div className="pt-page">
@@ -47,6 +49,7 @@ export default function FacilityDetailsPage() {
       {f.data_last_verified_at && (
         <p className="pt-verified">{t('last_verified')}: {new Date(f.data_last_verified_at).toLocaleString()}</p>
       )}
+      <p className="pt-disclaimer">{t('prototype_note')}</p>
       <p className="pt-disclaimer">{t('call_before')}</p>
     </div>
   )

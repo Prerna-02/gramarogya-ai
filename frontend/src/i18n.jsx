@@ -55,7 +55,29 @@ const T = {
   disclaimer: { en: 'Guidance only — this app does not diagnose. In an emergency call 108.', hi: 'केवल मार्गदर्शन — यह ऐप निदान नहीं करता। आपातकाल में 108 पर कॉल करें।', mr: 'फक्त मार्गदर्शन — हे ॲप निदान करत नाही. आणीबाणीत १०८ वर कॉल करा.' },
   no_outbreak: { en: 'No active outbreak alerts in your area right now.', hi: 'अभी आपके क्षेत्र में कोई सक्रिय प्रकोप चेतावनी नहीं है।', mr: 'सध्या तुमच्या भागात कोणतीही सक्रिय उद्रेक सूचना नाही.' },
   stay_safe: { en: 'Stay safe', hi: 'सुरक्षित रहें', mr: 'सुरक्षित राहा' },
+  describe_problem: { en: 'Describe your problem', hi: 'अपनी समस्या बताएं', mr: 'तुमची समस्या सांगा' },
+  search_action: { en: 'Search', hi: 'खोजें', mr: 'शोधा' },
+  suggestions: { en: 'Suggestions', hi: 'सुझाव', mr: 'सूचना' },
+  emergency_now: { en: 'This may be an emergency — call 108 now', hi: 'यह आपातकाल हो सकता है — अभी 108 पर कॉल करें', mr: 'ही आणीबाणी असू शकते — आत्ताच १०८ वर कॉल करा' },
+  call_108: { en: 'Call 108', hi: '108 पर कॉल करें', mr: '१०८ वर कॉल करा' },
+  no_diagnosis: { en: 'We do not diagnose or suggest any treatment. Here are facilities that can help.', hi: 'हम निदान या कोई उपचार नहीं सुझाते। यहाँ मदद कर सकने वाले अस्पताल हैं।', mr: 'आम्ही निदान किंवा कोणताही उपचार सुचवत नाही. मदत करू शकणारी रुग्णालये येथे आहेत.' },
+  suggested_facilities: { en: 'Suggested facilities', hi: 'सुझाए गए अस्पताल', mr: 'सुचवलेली रुग्णालये' },
+  prototype_note: { en: 'Prototype network — please verify location and availability before travelling.', hi: 'प्रोटोटाइप नेटवर्क — यात्रा से पहले स्थान और उपलब्धता की पुष्टि करें।', mr: 'प्रोटोटाइप नेटवर्क — प्रवासापूर्वी ठिकाण व उपलब्धता तपासा.' },
+  approx_map: { en: 'Approximate locations — use Directions for the exact route.', hi: 'अनुमानित स्थान — सटीक मार्ग के लिए दिशा-निर्देश का उपयोग करें।', mr: 'अंदाजे ठिकाणे — नेमक्या मार्गासाठी दिशा वापरा.' },
 }
+
+// Symptom suggestions: `q` (English) is sent to triage; labels are shown per language.
+export const SUGGESTIONS = [
+  { q: 'fever', en: 'Fever', hi: 'बुखार', mr: 'ताप' },
+  { q: 'cough cold', en: 'Cough / cold', hi: 'खांसी / सर्दी', mr: 'खोकला / सर्दी' },
+  { q: 'chest pain', en: 'Chest pain', hi: 'छाती में दर्द', mr: 'छातीत दुखणे' },
+  { q: 'difficulty breathing', en: 'Breathing difficulty', hi: 'साँस लेने में तकलीफ', mr: 'श्वास घेण्यास त्रास' },
+  { q: 'injury fracture', en: 'Injury / fracture', hi: 'चोट / फ्रैक्चर', mr: 'दुखापत / फ्रॅक्चर' },
+  { q: 'pregnancy labour', en: 'Pregnancy', hi: 'गर्भावस्था', mr: 'गर्भधारणा' },
+  { q: 'accident', en: 'Accident', hi: 'दुर्घटना', mr: 'अपघात' },
+  { q: 'snake bite', en: 'Snake bite', hi: 'साँप का काटना', mr: 'साप चावणे' },
+  { q: 'diarrhea vomiting', en: 'Diarrhea / vomiting', hi: 'दस्त / उल्टी', mr: 'जुलाब / उलटी' },
+]
 
 const I18nContext = createContext(null)
 

@@ -169,3 +169,12 @@
 .pt-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0.4rem; text-decoration: none; color: var(--pt-ink2); font-size: 0.68rem; border-radius: 12px; }
 .pt-nav-item.active { color: var(--pt-primary); background: #eef7f2; }
 .pt-nav-icon { font-size: 1.15rem; }
+
+/* Symptom search + triage */
+.pt-searchbar { display: flex; gap: 0.5rem; }
+.pt-searchbar input { flex: 1; border: 1px solid var(--pt-line); border-radius: 13px; padding: 0.75rem 0.9rem; font-size: 0.9rem; background: #fff; }
+.pt-searchbar input:focus { outline: none; border-color: var(--pt-primary); box-shadow: 0 0 0 3px rgba(14,159,110,0.12); }
+.pt-searchbar button { border: none; background: var(--pt-primary); color: #fff; border-radius: 13px; padding: 0 1.1rem; font-weight: 700; cursor: pointer; }
+.pt-emerg-banner { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border-radius: 15px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; font-weight: 700; box-shadow: 0 10px 24px rgba(220,38,38,0.35); animation: sospulse 2s infinite; }
+.pt-emerg-call { align-self: flex-start; background: #fff; color: #dc2626; text-decoration: none; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 800; }
+.pt-note { background: #eef7f2; border: 1px solid #cfeadd; color: #14532d; border-radius: 12px; padding: 0.7rem 0.9rem; font-size: 0.82rem; }

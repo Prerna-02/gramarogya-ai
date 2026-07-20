@@ -58,6 +58,75 @@ def facility_detail(db: Session, facility_id: int) -> dict | None:
     }
 
 
+# ------------------------------------------------------------------ triage (safety)
+# PROTOTYPE keyword rules — must be clinician-reviewed before real use.
+# Red flags route to emergency (call 108). The engine NEVER returns a remedy or
+# diagnosis; it only points to a facility that can help + the emergency number.
+RED_FLAGS = [
+    "chest pain", "heart attack", "cardiac", "breathless", "can't breathe", "cant breathe",
+    "difficulty breathing", "shortness of breath", "not breathing", "blue lips",
+    "unconscious", "faint", "collapse", "severe bleeding", "heavy bleeding", "bleeding a lot",
+    "stroke", "paralysis", "slurred", "seizure", "convulsion", "fits", "snake bite", "snakebite",
+    "poison", "overdose", "severe injury", "major accident", "severe burn", "electric shock",
+    "drowning", "water broke", "pregnancy bleeding", "labour pain", "labor pain",
+    "छाती", "दम", "साँस", "बेहोश", "सांप", "रक्तस्राव",  # hi
+    "छातीत", "श्वास", "बेशुद्ध", "साप",                  # mr
+]
+CATEGORY_KEYWORDS = {
+    "maternity": ["pregnan", "delivery", "labour", "labor", "antenatal", "newborn", "obstetric",
+                  "गर्भ", "प्रसूती", "प्रसूत"],
+    "trauma": ["injur", "fracture", "broken", "wound", "cut", "fell", "fall", "burn", "accident",
+               "चोट", "फ्रैक्चर", "दुखाप", "जखम"],
+    "fever": ["fever", "cough", "cold", "dengue", "malaria", "typhoid", "diarr", "vomit", "flu",
+              "infection", "बुखार", "खांसी", "ताप", "खोकला", "सर्दी"],
+}
+CATEGORY_CAPS = {
+    "emergency": ["Emergency", "ICU", "Trauma", "Surgery"],
+    "maternity": ["Maternity"],
+    "trauma": ["Trauma", "Emergency", "Surgery"],
+    "fever": ["General", "Emergency"],
+    "general": [],
+}
+
+
+def triage(db: Session, text: str) -> dict:
+    """Symptom -> service routing. Never diagnoses or suggests treatment."""
+    tl = (text or "").lower().strip()
+    red = [kw for kw in RED_FLAGS if kw in tl]
+    if red:
+        category, emergency = "emergency", True
+    else:
+        category, emergency = "general", False
+        for cat, kws in CATEGORY_KEYWORDS.items():
+            if any(kw in tl for kw in kws):
+                category = cat
+                break
+
+    facilities = rank_facilities(db)
+    caps = CATEGORY_CAPS[category]
+    if caps:
+        matched = [f for f in facilities
+                   if any(any(c.lower() in cap.lower() for cap in f["capabilities"]) for c in caps)]
+        facilities = matched or facilities
+
+    if emergency:
+        message = ("This may be a medical emergency. Call 108 now. The facilities below can provide "
+                   "emergency care.")
+    else:
+        message = ("Based on what you described, here are suitable nearby facilities. If symptoms are "
+                   "severe or worsening, call 108.")
+    return {
+        "input": text,
+        "category": category,
+        "is_emergency": emergency,
+        "matched_red_flags": red,
+        "message": message,
+        "emergency_number": "108",
+        "disclaimer": "This app does not diagnose illness or suggest any treatment or remedy.",
+        "facilities": facilities[:4],
+    }
+
+
 def outbreak_alert(db: Session) -> dict:
     """Public-safe outbreak advisory from recent surveillance signals (guest)."""
     rows = db.scalars(select(DailyDemand).order_by(DailyDemand.date.desc()).limit(14)).all()

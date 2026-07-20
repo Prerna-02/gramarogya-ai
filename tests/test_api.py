@@ -88,6 +88,25 @@ def test_dashboard_summary_authed(admin_token):
 
 
 @needs_db
+def test_triage_emergency_never_suggests_treatment():
+    """Guardrail: a symptom + 'suggest a remedy' must NOT return treatment — it
+    flags an emergency and points to a facility + the emergency number."""
+    r = client.get("/api/patient/triage", params={"text": "I have chest pain, suggest a remedy"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["is_emergency"] is True
+    assert body["emergency_number"] == "108"
+    assert body["facilities"]                       # recommends a facility
+    assert "not diagnose" in body["disclaimer"].lower()
+
+
+@needs_db
+def test_triage_routes_symptom_to_service():
+    assert client.get("/api/patient/triage", params={"text": "high fever and cough"}).json()["category"] == "fever"
+    assert client.get("/api/patient/triage", params={"text": "my wife is in labour"}).json()["category"] == "maternity"
+
+
+@needs_db
 def test_planning_run_creates_connected_outputs(admin_token):
     """Phase 9 completion check: one request -> forecast+resources+roster under one id."""
     h = {"Authorization": f"Bearer {admin_token}"}

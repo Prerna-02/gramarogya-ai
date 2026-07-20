@@ -222,6 +222,13 @@ def patient_outbreak_alert(db: Session = Depends(get_db)):
     return patient_routing.outbreak_alert(db)
 
 
+@router.get("/patient/triage", tags=["patient"])
+def patient_triage(text: str = Query("", max_length=300), db: Session = Depends(get_db)):
+    """Symptom -> facility routing (guest). NEVER diagnoses or suggests treatment;
+    red-flag symptoms return an emergency prompt (call 108) + capable facilities."""
+    return patient_routing.triage(db, text)
+
+
 # ----------------------------------------------------------------- helpers
 def _latest(db: Session) -> date:
     d = db.scalar(select(DailyDemand.date).order_by(DailyDemand.date.desc()).limit(1))

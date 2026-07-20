@@ -73,5 +73,6 @@ export const api = {
     request(`/api/patient/facilities${service ? `?service=${encodeURIComponent(service)}` : ''}`, { auth: false }),
   facilityDetail: (id) => request(`/api/patient/facilities/${id}`, { auth: false }),
   outbreakAlert: () => request('/api/patient/outbreak-alert', { auth: false }),
+  triage: (text) => request(`/api/patient/triage?text=${encodeURIComponent(text)}`, { auth: false }),
 }
 

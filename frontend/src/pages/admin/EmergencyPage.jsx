@@ -82,6 +82,8 @@ export default function EmergencyPage() {
                 <span><i style={{ background: '#dc2626' }} /> Busy</span>
               </div>
             </div>
+            <p className="muted small">Approximate prototype locations — a verified facility geodata set is
+              required before operational use.</p>
           </section>
 
           <div className="grid-2">
