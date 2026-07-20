@@ -52,7 +52,7 @@ def _scenarios() -> dict:
 
 
 def list_scenarios() -> list[dict]:
-    return [{k: s[k] for k in ("id", "name", "icon", "category", "description", "duration_days")}
+    return [{k: s.get(k) for k in ("id", "name", "icon", "category", "examples", "description", "duration_days")}
             for s in _scenarios().values()]
 
 
@@ -99,8 +99,12 @@ def simulate_scenario(db: Session, scenario_id: str, severity: int = 3,
     bplan = plan_resources({t: baseline[peak_i][t] for t in TARGETS})
     splan = plan_resources({t: surged[peak_i][t] for t in TARGETS})
 
-    curated = list(dict.fromkeys(scen["stresses"] + ["general_beds", "emergency_beds",
-                   "isolation_beds", "oxygen_cylinders", "ambulances"]))
+    # Show footfall-driven resources (staff/consumables) AND beds, so the impact
+    # reflects the whole surge — not just beds (which only serve admissions).
+    curated = list(dict.fromkeys(
+        ["general_doctors", "emergency_doctors", "nursing_officers", "diagnostic_test_kits"]
+        + scen["stresses"]
+        + ["general_beds", "emergency_beds", "isolation_beds", "oxygen_cylinders", "ambulances"]))
     resources = []
     for name in curated:
         sl, bl = _line(splan, name), _line(bplan, name)
@@ -134,6 +138,8 @@ def simulate_scenario(db: Session, scenario_id: str, severity: int = 3,
         "impact": {"peak_baseline": baseline[peak_i]["total_patient_arrivals"],
                    "peak_surged": surged[peak_i]["total_patient_arrivals"],
                    "peak_date": surged[peak_i]["date"], "extra_patients": extra_patients,
+                   "baseline_admissions": baseline[peak_i]["expected_admissions"],
+                   "surged_admissions": surged[peak_i]["expected_admissions"],
                    "overflow_estimate": int(overflow), "risk_level": risk,
                    "shortage_count": splan["summary"]["shortage_count"]},
         "resources": resources,

@@ -113,10 +113,10 @@ def test_emergency_scenarios_and_simulation(admin_token):
     if scen.status_code == 503:
         pytest.skip("model not trained")
     ids = [s["id"] for s in scen.json()["scenarios"]]
-    assert "dengue_outbreak" in ids and "mass_casualty" in ids
+    assert "disease_outbreak" in ids and "mass_casualty" in ids
 
-    low = client.post("/api/emergency/simulate", headers=h, json={"scenario_id": "dengue_outbreak", "severity": 1}).json()
-    high = client.post("/api/emergency/simulate", headers=h, json={"scenario_id": "dengue_outbreak", "severity": 5}).json()
+    low = client.post("/api/emergency/simulate", headers=h, json={"scenario_id": "disease_outbreak", "severity": 1}).json()
+    high = client.post("/api/emergency/simulate", headers=h, json={"scenario_id": "disease_outbreak", "severity": 5}).json()
     # higher severity => bigger surge and never smaller peak
     assert high["impact"]["extra_patients"] > low["impact"]["extra_patients"]
     assert high["impact"]["peak_surged"] >= high["impact"]["peak_baseline"]

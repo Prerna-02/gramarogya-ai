@@ -35,10 +35,11 @@ function Impact({ sim }) {
       <div className="metric-card"><div className="metric-label">Risk level</div>
         <div className={`metric-value tone-${RISK_TONE[sim.impact.risk_level]} risk-pulse`}>{sim.impact.risk_level}</div>
         <div className="metric-sub">peak {sim.impact.peak_date}</div></div>
-      <div className="metric-card"><div className="metric-label">Peak inflow</div>
-        <div className="metric-value">{peak}</div><div className="metric-sub">baseline {sim.impact.peak_baseline}</div></div>
-      <div className="metric-card"><div className="metric-label">Extra patients</div>
-        <div className="metric-value tone-warn">+{extra}</div><div className="metric-sub">over {sim.horizon} days</div></div>
+      <div className="metric-card"><div className="metric-label">Peak inflow (mostly OPD)</div>
+        <div className="metric-value">{peak}</div><div className="metric-sub">baseline {sim.impact.peak_baseline} · +{extra} over {sim.horizon}d</div></div>
+      <div className="metric-card"><div className="metric-label">Admissions (need beds)</div>
+        <div className="metric-value tone-warn">{sim.impact.baseline_admissions}→{sim.impact.surged_admissions}</div>
+        <div className="metric-sub">only inpatients use beds</div></div>
       <div className="metric-card"><div className="metric-label">Projected overflow</div>
         <div className={`metric-value ${overflow ? 'tone-critical' : 'tone-good'}`}>{overflow}</div>
         <div className="metric-sub">beds beyond capacity</div></div>
@@ -98,6 +99,7 @@ export default function ScenarioPlanner() {
           <button key={s.id} className={`scen-card ${sel === s.id ? 'active' : ''}`} onClick={() => setSel(s.id)}>
             <span className="scen-ic">{s.icon}</span>
             <span className="scen-name">{s.name}</span>
+            {s.examples && <span className="scen-ex">{s.examples}</span>}
             <span className="scen-cat">{s.category}</span>
           </button>
         ))}
@@ -147,6 +149,9 @@ export default function ScenarioPlanner() {
                 ))}
               </div>
               <p className="muted small">Bar = required under surge · marker = available · red = shortage.</p>
+              <p className="muted small">Most inflow is outpatient (seen &amp; sent home). Beds only serve
+                <b> admissions</b>, so bed pressure is far smaller than total footfall — while staff and
+                consumables scale with the whole surge.</p>
             </div>
           </div>
 

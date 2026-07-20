@@ -361,3 +361,5 @@ tr.short td { background: #fef2f2; }
 .d-phase.accepted { color: #16a34a; } .d-phase.declined { color: #dc2626; }
 .d-phase.ack { color: #d97706; } .d-phase.sending, .d-phase.delivered { color: #2563eb; }
 .leaflet-container path.leaflet-interactive { transition: stroke 0.3s; }
+
+.scen-ex { font-size: 0.66rem; color: var(--muted); text-align: center; line-height: 1.3; }
