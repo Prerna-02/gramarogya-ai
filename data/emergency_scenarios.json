@@ -1,0 +1,95 @@
+{
+  "_note": "Runtime emergency-scenario configuration (Phase 12). These are NEVER baked into the historical dataset. At runtime the admin picks a scenario + severity (1-5); the engine temporarily adds `surge_per_severity` x severity to the baseline forecast, then recomputes resource shortages and alerts. Prototype values — clinician review required.",
+  "scenarios": [
+    {
+      "id": "dengue_outbreak",
+      "name": "Dengue / Fever Outbreak",
+      "icon": "🦟",
+      "category": "outbreak",
+      "description": "Vector-borne fever surge (dengue/malaria) — mainly fever & infectious cases.",
+      "duration_days": 10,
+      "surge_per_severity": { "fever_infectious_arrivals": 11, "expected_admissions": 1.2 },
+      "stresses": ["diagnostic_test_kits", "isolation_beds", "iv_fluids", "ppe_kits", "general_beds"],
+      "support_needed": ["General", "Lab", "Isolation"],
+      "precautions": [
+        "Open a dedicated fever screening & triage counter",
+        "Prepare additional isolation beds and increase ward nursing",
+        "Stock up diagnostic test kits, IV fluids and antipyretics",
+        "Issue a vector-control and early-care advisory to villages",
+        "Activate an additional physician on-call"
+      ]
+    },
+    {
+      "id": "respiratory_outbreak",
+      "name": "Respiratory Outbreak",
+      "icon": "🫁",
+      "category": "outbreak",
+      "description": "Respiratory illness surge — oxygen and PPE demand rises sharply.",
+      "duration_days": 12,
+      "surge_per_severity": { "fever_infectious_arrivals": 7, "expected_admissions": 1.5 },
+      "stresses": ["oxygen_cylinders", "ppe_kits", "isolation_beds", "emergency_beds"],
+      "support_needed": ["ICU", "Emergency", "General"],
+      "precautions": [
+        "Verify oxygen cylinder stock and refill logistics",
+        "Prepare isolation beds with oxygen support",
+        "Ensure adequate PPE for staff",
+        "Set up a respiratory triage pathway",
+        "Pre-alert facilities with ICU / ventilator capacity"
+      ]
+    },
+    {
+      "id": "diarrheal_flood",
+      "name": "Diarrhoeal / Flood Surge",
+      "icon": "🌊",
+      "category": "outbreak",
+      "description": "Water-borne / flood-linked surge — gastrointestinal cases and access disruption.",
+      "duration_days": 8,
+      "surge_per_severity": { "fever_infectious_arrivals": 7, "general_opd_arrivals": 4, "expected_admissions": 1.0 },
+      "stresses": ["ors", "iv_fluids", "diagnostic_test_kits", "general_beds"],
+      "support_needed": ["General", "Ambulance"],
+      "precautions": [
+        "Stock ORS and IV fluids for rehydration",
+        "Issue a safe-drinking-water advisory",
+        "Position ambulances for flood-cut villages",
+        "Prepare observation beds for rehydration",
+        "Coordinate with public-health surveillance"
+      ]
+    },
+    {
+      "id": "festival_surge",
+      "name": "Festival / Event Surge",
+      "icon": "🎪",
+      "category": "event",
+      "description": "Large gathering — trauma, injuries and general OPD load rise.",
+      "duration_days": 3,
+      "surge_per_severity": { "trauma_emergency_arrivals": 7, "general_opd_arrivals": 6, "expected_admissions": 0.8 },
+      "stresses": ["emergency_beds", "ambulances", "general_beds"],
+      "support_needed": ["Emergency", "Trauma", "Ambulance"],
+      "precautions": [
+        "Add emergency-duty doctors and nursing for peak hours",
+        "Keep emergency beds and observation space ready",
+        "Position ambulances near the event site",
+        "Stock wound-care and basic trauma supplies",
+        "Brief nearby facilities on possible referrals"
+      ]
+    },
+    {
+      "id": "mass_casualty",
+      "name": "Mass Casualty / Road Accident",
+      "icon": "🚨",
+      "category": "emergency",
+      "description": "Sudden multi-injury event — sharp trauma spike needing surgery/ICU support.",
+      "duration_days": 2,
+      "surge_per_severity": { "trauma_emergency_arrivals": 12, "expected_admissions": 3.0 },
+      "stresses": ["emergency_beds", "ambulances", "oxygen_cylinders", "general_beds"],
+      "support_needed": ["Trauma", "Surgery", "ICU", "Ambulance"],
+      "precautions": [
+        "Trigger the mass-casualty protocol and recall staff",
+        "Clear and ready emergency + surgical beds",
+        "Dispatch all available ambulances",
+        "Alert blood bank and surgical teams",
+        "Immediately request referral capacity from nearby hospitals"
+      ]
+    }
+  ]
+}

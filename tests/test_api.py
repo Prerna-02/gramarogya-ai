@@ -107,6 +107,24 @@ def test_triage_routes_symptom_to_service():
 
 
 @needs_db
+def test_emergency_scenarios_and_simulation(admin_token):
+    h = {"Authorization": f"Bearer {admin_token}"}
+    scen = client.get("/api/emergency/scenarios", headers=h)
+    if scen.status_code == 503:
+        pytest.skip("model not trained")
+    ids = [s["id"] for s in scen.json()["scenarios"]]
+    assert "dengue_outbreak" in ids and "mass_casualty" in ids
+
+    low = client.post("/api/emergency/simulate", headers=h, json={"scenario_id": "dengue_outbreak", "severity": 1}).json()
+    high = client.post("/api/emergency/simulate", headers=h, json={"scenario_id": "dengue_outbreak", "severity": 5}).json()
+    # higher severity => bigger surge and never smaller peak
+    assert high["impact"]["extra_patients"] > low["impact"]["extra_patients"]
+    assert high["impact"]["peak_surged"] >= high["impact"]["peak_baseline"]
+    assert high["resources"] and high["precautions"] and high["facilities"]
+    assert high["alert"]["status"] == "draft"
+
+
+@needs_db
 def test_planning_run_creates_connected_outputs(admin_token):
     """Phase 9 completion check: one request -> forecast+resources+roster under one id."""
     h = {"Authorization": f"Bearer {admin_token}"}

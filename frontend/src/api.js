@@ -69,6 +69,10 @@ export const api = {
     request('/api/workforce/generate', { method: 'POST', body: { horizon_days: roster_horizon_days, roster_horizon_days } }),
   emergencyCheck: (horizon_days = 7) =>
     request('/api/emergency/check', { method: 'POST', body: { horizon_days } }),
+  emergencyScenarios: () => request('/api/emergency/scenarios'),
+  emergencySimulate: (scenario_id, severity, horizon_days = 7) =>
+    request('/api/emergency/simulate', { method: 'POST', body: { scenario_id, severity, horizon_days } }),
+  emergencySendAlert: (body) => request('/api/emergency/alerts', { method: 'POST', body }),
   facilities: (service) =>
     request(`/api/patient/facilities${service ? `?service=${encodeURIComponent(service)}` : ''}`, { auth: false }),
   facilityDetail: (id) => request(`/api/patient/facilities/${id}`, { auth: false }),

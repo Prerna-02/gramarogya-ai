@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from backend.auth import authenticate, create_access_token, require_admin
 from backend.db import get_db
 from backend.db_models import DailyDemand, NearbyFacility, PlanningRun, ResourceStatus, Staff
-from backend.schemas import ForecastRequest, PlanningRunRequest, TokenResponse
+from backend.schemas import (
+    ForecastRequest, PlanningRunRequest, SendAlertRequest, SimulateRequest, TokenResponse,
+)
 from backend.services import emergency, llm_summary, patient_routing
 from backend.services.forecasting import (
     ModelNotTrained, backtest_latest, future_forecast, is_ready, last_data_date,
@@ -146,6 +148,35 @@ def emergency_check(body: ForecastRequest, _=Depends(require_admin)):
     if not is_ready():
         raise HTTPException(503, "Forecast model not trained.")
     return emergency.check_capacity(body.start_date or _default_start(), body.horizon_days)
+
+
+@router.get("/emergency/scenarios", tags=["emergency"])
+def emergency_scenarios(_=Depends(require_admin)):
+    return {"scenarios": emergency.list_scenarios()}
+
+
+@router.post("/emergency/simulate", tags=["emergency"])
+def emergency_simulate(body: SimulateRequest, db: Session = Depends(get_db), _=Depends(require_admin)):
+    if not is_ready():
+        raise HTTPException(503, "Forecast model not trained.")
+    try:
+        return emergency.simulate_scenario(db, body.scenario_id, body.severity,
+                                           body.start_date, body.horizon_days)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@router.post("/emergency/alerts", tags=["emergency"])
+def emergency_send_alert(body: SendAlertRequest, db: Session = Depends(get_db), _=Depends(require_admin)):
+    """Persist an approved alert as 'sent' (human-approved). Facility responses
+    are simulated in the prototype UI."""
+    from backend.db_models import EmergencyAlert
+    alert = EmergencyAlert(scenario=body.scenario, severity=body.severity,
+                           requested_support=", ".join(body.requested_support), status="sent")
+    db.add(alert)
+    db.commit()
+    return {"alert_id": alert.id, "status": "sent", "scenario": body.scenario,
+            "notified_facilities": body.facility_ids}
 
 
 # ----------------------------------------------------------------- dashboard

@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 
 import { api } from '../../api.js'
 import MetricCard from '../../components/MetricCard.jsx'
+import ScenarioPlanner from '../../components/ScenarioPlanner.jsx'
 
 const HORIZONS = [7, 14, 21, 30]
 const TONE = { Normal: 'good', Watch: 'warn', High: 'serious', Critical: 'critical' }
@@ -122,6 +123,8 @@ export default function EmergencyPage() {
               <p className="muted small">Prototype network — verify availability before referral.</p>
             </section>
           </div>
+
+          <ScenarioPlanner />
         </>
       )}
     </div>

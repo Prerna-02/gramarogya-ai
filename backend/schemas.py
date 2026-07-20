@@ -38,3 +38,18 @@ class PlanningRunSummary(BaseModel):
 class ForecastRequest(BaseModel):
     start_date: date | None = None
     horizon_days: int = Field(7, ge=1, le=30)
+
+
+# ---- emergency scenario planner ----
+class SimulateRequest(BaseModel):
+    scenario_id: str
+    severity: int = Field(3, ge=1, le=5)
+    start_date: date | None = None
+    horizon_days: int = Field(7, ge=1, le=30)
+
+
+class SendAlertRequest(BaseModel):
+    scenario: str
+    severity: int = Field(3, ge=1, le=5)
+    requested_support: list[str] = []
+    facility_ids: list[int] = []
