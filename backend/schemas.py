@@ -52,7 +52,7 @@ class SendAlertRequest(BaseModel):
     scenario: str
     severity: int = Field(3, ge=1, le=5)
     requested_support: list[str] = []
-    facility_ids: list[int] = []
+    facility_ids: list[str | int] = []  # facility ids are mixed (neighbours use ints, the primary uses a string id)
 
 
 # ---- governance / audit ----

@@ -74,13 +74,24 @@ def future_forecast(start_date, horizon: int) -> list[dict]:
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
 
+    last_observed = hist["date"].max().date()
+    # When a user selects a date beyond the day after history, recursively bridge
+    # every missing day before returning the requested window. Lag features then
+    # describe the correct preceding dates rather than jumping across the gap.
+    origin = last_observed + timedelta(days=1) if start_date > last_observed + timedelta(days=1) else start_date
+    bridge_days = max(0, (start_date - origin).days)
+
     monthly = _monthly_weather(hist)
     market_dow = int(hist.loc[hist["weekly_market_day"] == 1, "day_of_week_num"].mode().iloc[0])
+    maternal_days = hist.loc[hist["maternal_clinic_day"] == 1, "day_of_week_num"]
+    maternal_dow = int(maternal_days.mode().iloc[0]) if not maternal_days.empty else None
+    admission_rate_by_dow = (hist["expected_admissions"] / hist["total_patient_arrivals"].clip(lower=1)) \
+        .groupby(hist["day_of_week_num"]).mean().to_dict()
     totals = hist["total_patient_arrivals"].astype(float).tolist()   # extended recursively
 
     out = []
-    for i in range(horizon):
-        d = start_date + timedelta(days=i)
+    for i in range(bridge_days + horizon):
+        d = origin + timedelta(days=i)
         wk = monthly.loc[d.month]
         dow = d.isoweekday()
         row = {
@@ -91,7 +102,9 @@ def future_forecast(start_date, horizon: int) -> list[dict]:
             "is_weekend": 1 if dow >= 6 else 0,
             "public_holiday": 0, "festival_flag": 0,
             "weekly_market_day": 1 if dow == market_dow else 0,
-            "vaccination_camp_flag": 0, "maternal_clinic_day": 0, "local_event_intensity": 0,
+            "vaccination_camp_flag": 0,
+            "maternal_clinic_day": 1 if maternal_dow is not None and dow == maternal_dow else 0,
+            "local_event_intensity": 0,
             "rainfall_mm": float(wk["rainfall_mm"]), "temperature_max_c": float(wk["temperature_max_c"]),
             "temperature_min_c": float(wk["temperature_min_c"]), "humidity_pct": float(wk["humidity_pct"]),
             "outbreak_type_enc": 0, "outbreak_severity_0_5": 0, "surveillance_alert": 0, "affected_villages": 0,
@@ -102,8 +115,16 @@ def future_forecast(start_date, horizon: int) -> list[dict]:
         }
         X = pd.DataFrame([row])[features].astype(float)
         preds = {t: max(0, round(float(models[t].predict(X)[0]))) for t in config["targets"]}
+        # The admissions target is low-volume and its direct model prediction
+        # can flatten after integer rounding. Calibrate its lower bound with the
+        # historical admission rate for the same weekday. This remains derived
+        # from the hospital dataset and lets distinct demand peaks propagate to
+        # bed planning instead of disappearing at the conversion step.
+        rate_based_admissions = round(preds["total_patient_arrivals"] * admission_rate_by_dow.get(dow, 0.06))
+        preds["expected_admissions"] = max(preds["expected_admissions"], rate_based_admissions)
         totals.append(float(preds["total_patient_arrivals"]))
-        out.append({"date": d.isoformat(), **preds})
+        if d >= start_date:
+            out.append({"date": d.isoformat(), **preds})
     return out
 
 
@@ -196,11 +217,31 @@ def total_series(start, horizon: int, context_days: int = 0) -> dict:
     win = [r for r in rows if r["kind"] == "window" and (r["actual"] is not None or r["predicted"] is not None)]
     vals = [(r["actual"] if r["actual"] is not None else r["predicted"]) for r in win]
     peak = max(win, key=lambda r: (r["actual"] if r["actual"] is not None else r["predicted"])) if win else None
+    # Expose separated local maxima in long windows without altering any model
+    # prediction. This prevents a tied weekly pattern being reduced to one date.
+    peak_indices = []
+    for index, value in enumerate(vals):
+        before = vals[index - 1] if index else float("-inf")
+        after = vals[index + 1] if index + 1 < len(vals) else float("-inf")
+        if value > before and value >= after:
+            peak_indices.append(index)
+    separated = []
+    for index in sorted(peak_indices, key=lambda idx: (-vals[idx], idx)):
+        if all(abs(index - existing) >= 4 for existing in separated):
+            separated.append(index)
+        if len(separated) == 3:
+            break
+    separated.sort()
+    peak_days = [{"date": win[index]["date"], "value": vals[index]} for index in separated]
+    peak_dates = {item["date"] for item in peak_days}
+    for row in rows:
+        row["is_peak"] = row["date"] in peak_dates
     return {
         "start": start.isoformat(), "horizon": horizon, "is_future": start > last,
         "last_data_date": last.isoformat(), "band_pct": 80, "series": rows,
         "avg": round(sum(vals) / len(vals)) if vals else None,
         "peak": {"date": peak["date"], "value": peak["actual"] if peak["actual"] is not None else peak["predicted"]} if peak else None,
+        "peak_days": peak_days,
         "total": round(sum(vals)) if vals else None,
     }
 
@@ -229,9 +270,15 @@ def model_info() -> dict:
     """Traceability: which model, its headline metrics, and when it was trained."""
     from datetime import datetime as _dt
     _, config = _load()
+    hist = _history()
     total = {x["model"]: x for x in model_metrics()["test_metrics"] if x["target"] == "total_patient_arrivals"}
     sel = total.get(config["selected_family"])
     mp = ARTIFACTS / "demand_model.joblib"
+    feature_columns = config["features"]
+    encoded_sources = {
+        "season_enc": "season",
+        "outbreak_type_enc": "outbreak_type",
+    }
     return {
         "selected_model": config["selected_family"],
         "n_features": len(config["features"]),
@@ -240,4 +287,19 @@ def model_info() -> dict:
         "trained_at": _dt.fromtimestamp(mp.stat().st_mtime).isoformat() if mp.exists() else None,
         "total_r2": round(sel["R2"], 3) if sel else None,
         "total_wape_pct": round(sel["WAPE"] * 100, 1) if sel else None,
+        "dataset": {
+            "name": DATA_CSV.name,
+            "records": int(len(hist)),
+            "date_start": hist["date"].min().date().isoformat(),
+            "date_end": hist["date"].max().date().isoformat(),
+            "columns": hist.columns.tolist(),
+            "source_feature_columns": [encoded_sources.get(column, column) for column in feature_columns],
+            "feature_columns": feature_columns,
+            "engineered_feature_columns": [
+                {"column": column, "derived_from": source}
+                for column, source in encoded_sources.items()
+                if column in feature_columns
+            ],
+            "target_columns": config["targets"],
+        },
     }

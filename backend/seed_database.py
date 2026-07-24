@@ -1,8 +1,9 @@
 """Seed the database from the source CSV files (Phase 4).
 
 Imports data/demand_resource_daily.csv into `daily_demand` + `resource_status`,
-data/staff_master.csv into `staff`, and a small prototype `nearby_facilities`
-set. Idempotent: truncates the seeded tables first so it can be re-run.
+data/staff_master.csv into `staff`, date-specific staff availability records,
+and a small prototype `nearby_facilities` set. Idempotent: truncates the seeded
+tables first so it can be re-run.
 
 Run:
     python -m backend.seed_database
@@ -67,6 +68,8 @@ def seed() -> None:
     df = pd.read_csv(DATA / "demand_resource_daily.csv")
     df["date"] = pd.to_datetime(df["date"]).dt.date   # real DATE, not text
     staff = pd.read_csv(DATA / "staff_master.csv")
+    staff_availability = pd.read_csv(DATA / "staff_availability.csv")
+    staff_availability["date"] = pd.to_datetime(staff_availability["date"]).dt.date
 
     demand = df[DEMAND_COLS].where(pd.notna(df[DEMAND_COLS]), None).copy()
     resource = df[RESOURCE_COLS].where(pd.notna(df[RESOURCE_COLS]), None).copy()
@@ -74,15 +77,19 @@ def seed() -> None:
     resource["data_last_verified_at"] = _now()
     staff = staff.copy()
     staff["created_at"] = _now()
+    staff_availability = staff_availability.where(pd.notna(staff_availability), None).copy()
+    staff_availability["created_at"] = _now()
 
     with engine.begin() as conn:
         # Clear seeded tables (respect FK order).
-        for tbl in ["resource_status", "daily_demand", "staff", "nearby_facilities"]:
+        for tbl in ["staff_availability", "resource_status", "daily_demand", "staff", "nearby_facilities"]:
             conn.execute(text(f'TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE'))
 
     demand.to_sql("daily_demand", engine, if_exists="append", index=False, chunksize=500, method="multi")
     resource.to_sql("resource_status", engine, if_exists="append", index=False, chunksize=500, method="multi")
     staff.to_sql("staff", engine, if_exists="append", index=False, chunksize=500, method="multi")
+    staff_availability.to_sql("staff_availability", engine, if_exists="append", index=False,
+                              chunksize=500, method="multi")
 
     with SessionLocal() as s:
         from backend.db_models import NearbyFacility
@@ -90,7 +97,7 @@ def seed() -> None:
         s.commit()
 
     with engine.connect() as conn:
-        for tbl in ["daily_demand", "resource_status", "staff", "nearby_facilities"]:
+        for tbl in ["daily_demand", "resource_status", "staff", "staff_availability", "nearby_facilities"]:
             n = conn.execute(text(f"SELECT COUNT(*) FROM {tbl}")).scalar()
             print(f"  {tbl:20s} {n} rows")
     print("Seed complete.")

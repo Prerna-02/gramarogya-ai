@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip as LTooltip } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import { api } from '../api.js'
+import SurgeCapacityChart from './SurgeCapacityChart.jsx'
 
 const RISK_TONE = { Normal: 'good', Watch: 'warn', High: 'serious', Critical: 'critical' }
 const PRIMARY = { name: 'Gadchiroli Rural Hospital', lat: 20.1849, lon: 79.9948 }
@@ -55,6 +56,7 @@ export default function ScenarioPlanner() {
   const [loading, setLoading] = useState(false)
   const [phase, setPhase] = useState({})
   const [sent, setSent] = useState(false)
+  const [dispatchError, setDispatchError] = useState('')
   const timers = useRef([])
 
   useEffect(() => {
@@ -63,17 +65,20 @@ export default function ScenarioPlanner() {
   }, [])
 
   const simulate = () => {
-    setLoading(true); setSim(null); setSent(false); setPhase({})
+    setLoading(true); setSim(null); setSent(false); setPhase({}); setDispatchError('')
     timers.current.forEach(clearTimeout); timers.current = []
     api.emergencySimulate(sel, severity).then(setSim).catch(() => {}).finally(() => setLoading(false))
   }
 
   const dispatch = async () => {
-    setSent(true)
     try {
       await api.emergencySendAlert({ scenario: sim.scenario.name, severity: sim.severity,
         requested_support: sim.alert.requested_support, facility_ids: sim.facilities.map((f) => f.id) })
-    } catch { /* still animate */ }
+      setSent(true)
+    } catch (error) {
+      setDispatchError(error.message || 'Alert dispatch failed. No facility was marked as notified.')
+      return
+    }
     const init = {}; sim.facilities.forEach((f) => { init[f.id] = 'sending' }); setPhase(init)
     sim.facilities.forEach((f, i) => {
       const base = 400 + i * 650
@@ -84,7 +89,6 @@ export default function ScenarioPlanner() {
     })
   }
 
-  const maxReq = useMemo(() => sim ? Math.max(...sim.resources.map((r) => Math.max(r.surged, r.available))) : 1, [sim])
   const bedsSecured = sim ? sim.facilities.filter((f) => phase[f.id] === 'accepted').reduce((s, f) => s + f.beds_available, 0) : 0
   const accepted = sim ? sim.facilities.filter((f) => phase[f.id] === 'accepted').length : 0
 
@@ -135,23 +139,9 @@ export default function ScenarioPlanner() {
             </div>
 
             <div className="sub-panel">
-              <h3>Impact on this hospital (peak day)</h3>
-              <div className="res-bars">
-                {sim.resources.map((r) => (
-                  <div key={r.resource} className="res-row">
-                    <span className="res-name">{r.resource.replace(/_/g, ' ')}</span>
-                    <div className="res-track">
-                      <div className={`res-fill ${r.shortage > 0 ? 'short' : ''}`} style={{ width: `${Math.min(100, (r.surged / maxReq) * 100)}%` }} />
-                      <div className="res-avail" style={{ left: `${Math.min(100, (r.available / maxReq) * 100)}%` }} title="available" />
-                    </div>
-                    <span className="res-num">{r.baseline}→<b>{r.surged}</b>{r.shortage > 0 && <em className="tone-critical"> −{r.shortage}</em>}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="muted small">Bar = required under surge · marker = available · red = shortage.</p>
-              <p className="muted small">Most inflow is outpatient (seen &amp; sent home). Beds only serve
-                <b> admissions</b>, so bed pressure is far smaller than total footfall — while staff and
-                consumables scale with the whole surge.</p>
+              <h3>Surge capacity pressure (peak day)</h3>
+              <p className="muted small">Peak-day readiness across critical resources under the selected scenario.</p>
+              <SurgeCapacityChart resources={sim.resources} />
             </div>
           </div>
 
@@ -170,6 +160,7 @@ export default function ScenarioPlanner() {
                 <h3>Alert nearby facilities</h3>
                 {!sent && <button className="run-btn small" onClick={dispatch}>📡 Send alerts (approve)</button>}
               </div>
+              {dispatchError && <div className="banner error small">{dispatchError}</div>}
               {sent && <div className="dispatch-progress">{accepted} of {sim.facilities.length} accepted · {bedsSecured} beds secured</div>}
               <div className="dispatch-map">
                 <MapContainer center={[19.9, 80.05]} zoom={8} scrollWheelZoom={false} style={{ height: 200, borderRadius: 8 }}>

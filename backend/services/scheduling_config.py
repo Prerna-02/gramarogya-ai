@@ -27,16 +27,18 @@ SEED = 42
 POP_SIZE = 40
 N_GEN = 40
 CONFIRMED_DAYS = 7               # days 1..7 confirmed, later days provisional
-DEFAULT_TARGET_WEEKLY_HOURS = 48
+# Hours above the normal 40-hour planning target count as overtime. Individual
+# ``max_weekly_hours`` remains the hard ceiling (typically 48 in staff_master).
+DEFAULT_TARGET_WEEKLY_HOURS = 40
 
 # ---- Post-optimization ranking (balanced recommendation) ---------------------
 # Applied ONLY to feasible Pareto solutions; never trades a hard constraint.
 RANKING_WEIGHTS = {
-    "coverage": 0.35,       # service coverage  (min understaffing)
-    "fairness": 0.25,       # workforce fairness (min inequality)
-    "fatigue": 0.20,        # fatigue reduction
+    "coverage": 0.50,       # service coverage  (min understaffing)
+    "fairness": 0.15,       # workforce fairness (min inequality)
+    "fatigue": 0.10,        # fatigue reduction
     "overtime": 0.10,       # overtime reduction
-    "preference": 0.10,     # preference satisfaction
+    "preference": 0.15,     # preference satisfaction
 }
 # Objective vector order used everywhere.
 OBJECTIVES = ["understaffing", "unfairness", "fatigue", "overtime", "preference_violation"]
@@ -76,16 +78,19 @@ COVERAGE_TEMPLATE = {
     "general_doctors": dict(designation="General Medical Officer", department="General OPD",
                             shifts=["Morning", "Evening"]),
     "physicians": dict(designation="Physician", department="Medicine",
-                       shifts=["Morning", "Evening"], oncall_shift="On-call"),
+                       shifts=["Morning", "Evening"], oncall_shift="On-call",
+                       oncall_when=("fever_infectious_arrivals", 19)),
     "emergency_doctors": dict(designation="Emergency Medical Officer", department="Emergency",
                               shifts=["Morning", "Evening", "Night"], around_clock=True,
                               skill="emergency"),
     "obgyn_doctors": dict(designation="Obstetrician and Gynecologist",
                           department="Maternal and Child Health",
                           shifts=["Morning"], oncall_shift="On-call",
+                          oncall_when=("maternal_child_arrivals", 9),
                           specialist="obgyn"),
     "pediatricians": dict(designation="Pediatrician", department="Maternal and Child Health",
-                          shifts=["Morning"], oncall_shift="On-call", specialist="pediatric"),
+                          shifts=["Morning"], oncall_shift="On-call",
+                          oncall_when=("maternal_child_arrivals", 9), specialist="pediatric"),
     "senior_nursing_officers": dict(designation="Senior Nursing Officer", department="Inpatient Ward",
                                     shifts=["Morning", "Evening", "Night"], around_clock=True,
                                     supervisory=True),
@@ -94,7 +99,8 @@ COVERAGE_TEMPLATE = {
     "anm_staff": dict(designation="Auxiliary Nurse Midwife", department="Maternal and Child Health",
                       shifts=["Morning", "Evening"]),
     "lab_technicians": dict(designation="Laboratory Technician", department="Laboratory",
-                            shifts=["Morning", "Evening"], oncall_shift="On-call"),
+                            shifts=["Morning", "Evening"], oncall_shift="On-call",
+                            oncall_when=("fever_infectious_arrivals", 19)),
     "pharmacists": dict(designation="Pharmacist", department="Pharmacy",
                         shifts=["Morning", "Evening"]),
     "ambulance_crew": dict(designation="Emergency Medical Technician and Driver", department="Ambulance",

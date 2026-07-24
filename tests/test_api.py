@@ -75,8 +75,10 @@ def test_patient_facilities_are_public(admin_token):
     facs = r.json()["facilities"]
     assert len(facs) >= 1
     assert all("rank" in f and "status" in f for f in facs)
-    # never leak sensitive fields
+    assert all("doctors" in f and "matched_doctors" in f for f in facs)
+    # Expose only public directory availability, never internal staff records.
     assert all("staff" not in f for f in facs)
+    assert all("max_weekly_hours" not in doctor for f in facs for doctor in f["doctors"])
 
 
 @needs_db
@@ -85,6 +87,85 @@ def test_dashboard_summary_authed(admin_token):
     assert r.status_code == 200
     body = r.json()
     assert body["staff_count"] > 0 and body["nearby_facilities"] > 0
+
+
+@needs_db
+def test_dashboard_operations_are_calculated_and_rule_driven(admin_token):
+    r = client.get("/api/dashboard/operations", headers={"Authorization": f"Bearer {admin_token}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["metrics"]["today_patients"] > 0
+    assert body["metrics"]["current_wait_minutes"] > 0
+    assert body["active_staff"] and body["department_coverage"]
+    assert body["wait_time_trend"] and body["resource_pressure"]
+    assert body["alert_engine"]["kind"] == "rule-driven"
+    assert all("action" in alert and alert["status"] == "Open" for alert in body["alerts"])
+
+
+@needs_db
+def test_dashboard_operations_follow_selected_forecast_window(admin_token):
+    r = client.get(
+        "/api/dashboard/operations",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        params={"start": "2026-01-08", "horizon": 14},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["forecast_selection"] == {
+        "start": "2026-01-08", "horizon": 14, "end": "2026-01-21"
+    }
+    assert len({item["date"] for item in body["resource_pressure"]}) == 14
+
+
+@needs_db
+def test_model_info_exposes_forecast_dataset_traceability(admin_token):
+    r = client.get(
+        "/api/system/model-info",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r.status_code == 200
+    dataset = r.json()["dataset"]
+    assert dataset["name"] == "demand_resource_daily.csv"
+    assert dataset["records"] > 0
+    assert "patients_lag_7" in dataset["feature_columns"]
+    assert "season" in dataset["source_feature_columns"]
+    assert "total_patient_arrivals" in dataset["target_columns"]
+    assert set(dataset["source_feature_columns"]).issubset(dataset["columns"])
+    assert {item["column"] for item in dataset["engineered_feature_columns"]} == {
+        "season_enc", "outbreak_type_enc"
+    }
+
+
+@needs_db
+def test_forecast_explanation_matches_selected_window(admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    body = client.get("/api/forecast/explain", headers=headers,
+                      params={"start": "2026-01-01", "horizon": 7}).json()
+    assert body["validated"] is True
+    assert body["context"]["period"] == "2026-01-01 to 2026-01-07"
+    assert body["evidence"]["forecast_days"] == 7
+    assert sum(item["share_pct"] for item in body["context"]["service_mix"]) == pytest.approx(100, abs=0.2)
+
+
+@needs_db
+def test_long_forecast_exposes_multiple_separated_peak_days(admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    body = client.get("/api/forecast/series", headers=headers,
+                      params={"start": "2026-01-01", "horizon": 21}).json()
+    assert [item["date"] for item in body["peak_days"]] == [
+        "2026-01-06", "2026-01-13", "2026-01-20",
+    ]
+
+
+@needs_db
+def test_forecast_peaks_propagate_to_physical_resource_pressure(admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    body = client.post("/api/resources/plan", headers=headers,
+                       json={"start_date": "2026-01-01", "horizon_days": 21}).json()
+    shortage_dates = [plan["date"] for plan in body["plans"]
+                      if plan["beds"]["general"]["shortage"] > 0]
+    assert {"2026-01-06", "2026-01-13", "2026-01-20"}.issubset(shortage_dates)
+    assert len(shortage_dates) >= 3
 
 
 @needs_db
@@ -97,6 +178,8 @@ def test_triage_emergency_never_suggests_treatment():
     assert body["is_emergency"] is True
     assert body["emergency_number"] == "108"
     assert body["facilities"]                       # recommends a facility
+    assert body["required_specialities"][0] == "Cardiology"
+    assert any(f["matched_doctors"] for f in body["facilities"])
     assert "not diagnose" in body["disclaimer"].lower()
 
 
@@ -104,6 +187,9 @@ def test_triage_emergency_never_suggests_treatment():
 def test_triage_routes_symptom_to_service():
     assert client.get("/api/patient/triage", params={"text": "high fever and cough"}).json()["category"] == "fever"
     assert client.get("/api/patient/triage", params={"text": "my wife is in labour"}).json()["category"] == "maternity"
+    labour = client.get("/api/patient/triage", params={"text": "severe labour pain"}).json()
+    assert labour["category"] == "maternity" and labour["is_emergency"] is True
+    assert labour["required_specialities"][0] == "Obstetrics & Gynaecology"
 
 
 @needs_db

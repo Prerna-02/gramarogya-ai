@@ -34,6 +34,13 @@ async function request(path, { method = 'GET', body, auth = true, form = false }
     } catch {
       /* ignore */
     }
+    // FastAPI validation errors return `detail` as an array of objects; flatten
+    // it to a readable string so the UI never shows "[object Object]".
+    if (Array.isArray(detail)) {
+      detail = detail.map((d) => d?.msg || JSON.stringify(d)).join('; ')
+    } else if (detail && typeof detail === 'object') {
+      detail = detail.msg || JSON.stringify(detail)
+    }
     throw new Error(detail)
   }
   return res.json()
@@ -49,6 +56,11 @@ export const api = {
   logout: () => clearToken(),
   health: () => request('/api/health', { auth: false }),
   dashboardSummary: () => request('/api/dashboard/summary'),
+  dashboardOperations: (start = null, horizon = 7) => {
+    const q = new URLSearchParams({ horizon })
+    if (start) q.set('start', start)
+    return request(`/api/dashboard/operations?${q}`)
+  },
   dashboardExplain: () => request('/api/dashboard/explain'),
   createPlanningRun: (horizon_days = 7) =>
     request('/api/planning-runs', { method: 'POST', body: { horizon_days } }),
@@ -63,8 +75,13 @@ export const api = {
   forecastBounds: () => request('/api/forecast/bounds'),
   forecastPatterns: () => request('/api/forecast/patterns'),
   modelMetrics: () => request('/api/forecast/model-metrics'),
-  resourcesPlan: (horizon_days = 7) =>
-    request('/api/resources/plan', { method: 'POST', body: { horizon_days } }),
+  forecastExplain: (start, horizon = 7) => {
+    const q = new URLSearchParams({ horizon })
+    if (start) q.set('start', start)
+    return request(`/api/forecast/explain?${q}`)
+  },
+  resourcesPlan: (horizon_days = 7, start_date = null) =>
+    request('/api/resources/plan', { method: 'POST', body: { horizon_days, ...(start_date ? { start_date } : {}) } }),
   workforceGenerate: (roster_horizon_days = 7) =>
     request('/api/workforce/generate', { method: 'POST', body: { horizon_days: roster_horizon_days, roster_horizon_days } }),
   emergencyCheck: (horizon_days = 7) =>
@@ -80,8 +97,11 @@ export const api = {
   modelInfo: () => request('/api/system/model-info'),
   facilities: (service) =>
     request(`/api/patient/facilities${service ? `?service=${encodeURIComponent(service)}` : ''}`, { auth: false }),
-  facilityDetail: (id) => request(`/api/patient/facilities/${id}`, { auth: false }),
+  facilityDetail: (id, specialities = []) => {
+    const query = new URLSearchParams()
+    specialities.forEach((speciality) => query.append('speciality', speciality))
+    return request(`/api/patient/facilities/${id}${query.size ? `?${query}` : ''}`, { auth: false })
+  },
   outbreakAlert: () => request('/api/patient/outbreak-alert', { auth: false }),
   triage: (text) => request(`/api/patient/triage?text=${encodeURIComponent(text)}`, { auth: false }),
 }
-

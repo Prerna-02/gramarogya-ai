@@ -1,0 +1,16 @@
+staff_id,date,availability_status,shift,reason
+NUR_018,2026-01-04,unavailable,Night,Approved night-shift restriction
+DOC_007,2026-01-05,training,,Internal medicine clinical training
+DOC_002,2026-01-06,leave,,Approved personal leave
+AHP_034,2026-01-08,leave,,Approved personal leave
+EMT_047,2026-01-09,unavailable,Night,Approved night-shift restriction
+DOC_008,2026-01-10,outreach,,Child health outreach clinic
+DOC_009,2026-01-13,leave,,Approved personal leave
+AHP_036,2026-01-17,training,,District laboratory quality training
+AHP_037,2026-01-17,outreach,,Field surveillance sample collection
+AHP_038,2026-01-17,sick,,Reported sick leave
+DOC_005,2026-01-20,sick,,Reported sick leave
+DOC_006,2026-01-20,training,,Emergency response training
+DOC_007,2026-01-23,leave,,Approved personal leave
+AHP_035,2026-01-27,leave,,Approved personal leave
+DOC_009,2026-01-29,training,,Maternal emergency skills training

@@ -35,7 +35,10 @@ RESOURCE_CONFIG = {
     },
     # Specialists: minimum coverage policy + demand escalation.
     "specialists": {
-        "obgyn_doctors": {"minimum": 2, "driver": "maternal_child_arrivals", "escalate_at": 13},
+        # One clinician is routine minimum coverage; a second is demand-triggered.
+        # This keeps a single-specialist vulnerability visible without fabricating
+        # a daily shortage when ordinary demand is within that clinician's cover.
+        "obgyn_doctors": {"minimum": 1, "driver": "maternal_child_arrivals", "escalate_at": 13},
         "pediatricians": {"minimum": 1, "driver": "maternal_child_arrivals", "escalate_at": 13},
     },
     # Nurses scale with beds in use.
@@ -80,6 +83,7 @@ class Requirement:
     available: int
     explanation: str
     reorder_needed: bool = False
+    reorder_point: int | None = None
 
     @property
     def shortage(self) -> int:
@@ -101,7 +105,8 @@ class Requirement:
         return {
             "resource": self.resource, "required": self.required, "available": self.available,
             "shortage": self.shortage, "surplus": self.surplus, "status": self.status,
-            "reorder_needed": self.reorder_needed, "explanation": self.explanation,
+            "reorder_needed": self.reorder_needed, "reorder_point": self.reorder_point,
+            "explanation": self.explanation,
         }
 
 
@@ -173,7 +178,7 @@ def _plan_medicines(f, avail, cfg):
         reorder_point = _ceil(req * r["lead"] + r["safety"])
         out[item] = Requirement(
             item, req, stock, f"{expl} = {req}; reorder point {reorder_point}",
-            reorder_needed=stock <= reorder_point)
+            reorder_needed=stock <= reorder_point, reorder_point=reorder_point)
     return out
 
 
@@ -223,7 +228,7 @@ def plan_resources(forecast: dict, availability: dict | None = None,
     reorders = [r.resource for r in all_reqs if r.reorder_needed and r.shortage == 0]
 
     n = len(shortages)
-    status = "Critical" if n >= 5 else "High" if n >= 3 else "Watch" if n >= 1 else "Normal"
+    status = "Critical" if n >= 5 else "High" if n >= 3 else "Watch" if n >= 1 or reorders else "Normal"
 
     return {
         "forecast": f,
@@ -240,3 +245,34 @@ def plan_resources(forecast: dict, availability: dict | None = None,
             "reorders": reorders,
         },
     }
+
+
+def plan_resource_window(forecast: list[dict], availability: dict | None = None,
+                         config: dict = RESOURCE_CONFIG,
+                         availability_by_date: dict[str, dict] | None = None) -> list[dict]:
+    """Plan a forecast window while carrying consumable stock between days.
+
+    Beds, oxygen, and ambulances are capacity constraints. Staff capacity may
+    vary by date when ``availability_by_date`` is supplied. Medicine/consumable
+    opening stock is reduced by planned use, so later shortages and reorder
+    warnings reflect the selected horizon. Deliveries are not assumed unless
+    supplied by a future inventory feed.
+    """
+    current = {**DEFAULT_AVAILABILITY, **(availability or {})}
+    medicine_names = set(config["medicines"])
+    plans = []
+    for day in forecast:
+        day_key = str(day.get("date"))
+        daily_availability = {
+            **current,
+            **((availability_by_date or {}).get(day_key, {})),
+        }
+        plan = plan_resources(day, daily_availability, config)
+        plan["date"] = day_key
+        plan["inventory_opening"] = {name: int(current.get(name, 0)) for name in medicine_names}
+        for name in medicine_names:
+            used = int(plan["medicines"][name]["required"])
+            current[name] = max(0, int(current.get(name, 0)) - used)
+        plan["inventory_closing"] = {name: int(current.get(name, 0)) for name in medicine_names}
+        plans.append(plan)
+    return plans

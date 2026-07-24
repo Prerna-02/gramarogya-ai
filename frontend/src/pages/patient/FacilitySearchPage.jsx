@@ -51,6 +51,10 @@ export default function FacilitySearchPage() {
             </div>
           )}
           <div className="pt-note">🛈 {t('no_diagnosis')}</div>
+          {result.required_specialities?.length > 0 && <div className="pt-speciality-match">
+            <span>Recommended speciality</span>
+            <strong>{result.required_specialities.join(' · ')}</strong>
+          </div>}
           <h3 className="pt-section">{t('suggested_facilities')}</h3>
           {result.facilities.map((f, i) => <FacilityCard key={f.id} f={f} best={i === 0 && !result.is_emergency} />)}
         </>

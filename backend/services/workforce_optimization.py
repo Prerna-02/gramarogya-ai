@@ -84,6 +84,7 @@ def build_staff_records(staff_df: pd.DataFrame) -> dict:
             "max_consecutive_working_days": int(r["max_consecutive_working_days"]),
             "max_night_shifts_per_month": int(r["max_night_shifts_per_month"]),
             "preferred_shift": r["preferred_shift"],
+            "weekly_off_preference": r.get("weekly_off_preference", "No preference"),
             "emergency_on_call": int(r["emergency_on_call"]),
             "active": str(r["active_status"]).lower() == "active",
             "group": FAIRNESS_GROUPS.get(r["designation"], "other"),
@@ -128,7 +129,9 @@ def build_shift_requirements(forecast_by_date: dict, dates: list[str], warnings:
                     designation=tmpl["designation"], min_count=max(1, c) if around else c,
                     preferred_count=max(1, c), role_key=role_key, skill=tmpl.get("skill"),
                     specialist=tmpl.get("specialist"), supervisory=tmpl.get("supervisory", False)))
-            if tmpl.get("oncall_shift"):
+            oncall_rule = tmpl.get("oncall_when")
+            oncall_needed = not oncall_rule or fc.get(oncall_rule[0], 0) >= oncall_rule[1]
+            if tmpl.get("oncall_shift") and oncall_needed:
                 reqs.append(ShiftRequirement(
                     date=d, shift=tmpl["oncall_shift"], department=tmpl["department"],
                     designation=tmpl["designation"], min_count=1, preferred_count=1,
@@ -180,8 +183,8 @@ def decode_roster(x, ctx) -> tuple[list[dict], dict]:
         sid, d, sh = a["staff_id"], a["date"], a["shift"]
         if sid in staff and d in date_index:
             sched[sid][d] = sh
-            iso = _isoweek(d)
-            hours_week[sid][iso] = hours_week[sid].get(iso, 0) + SHIFT_HOURS[sh][2]
+            week = _planning_week(d, dates)
+            hours_week[sid][week] = hours_week[sid].get(week, 0) + SHIFT_HOURS[sh][2]
             if sh == "Night":
                 night_count[sid] += 1
 
@@ -195,8 +198,8 @@ def decode_roster(x, ctx) -> tuple[list[dict], dict]:
             return False
         if (d, shift) in avail.get("unavailable_shifts", {}).get(sid, set()):
             return False
-        iso = _isoweek(d)
-        if hours_week[sid].get(iso, 0) + SHIFT_HOURS[shift][2] > s["max_weekly_hours"]:
+        week = _planning_week(d, dates)
+        if hours_week[sid].get(week, 0) + SHIFT_HOURS[shift][2] > s["max_weekly_hours"]:
             return False
         if shift == "Night" and night_count[sid] >= s["max_night_shifts_per_month"]:
             return False
@@ -231,8 +234,8 @@ def decode_roster(x, ctx) -> tuple[list[dict], dict]:
         for sid in order:
             if feasible(sid, slot.date, slot.shift):
                 sched[sid][slot.date] = slot.shift
-                iso = _isoweek(slot.date)
-                hours_week[sid][iso] = hours_week[sid].get(iso, 0) + SHIFT_HOURS[slot.shift][2]
+                week = _planning_week(slot.date, dates)
+                hours_week[sid][week] = hours_week[sid].get(week, 0) + SHIFT_HOURS[slot.shift][2]
                 if slot.shift == "Night":
                     night_count[sid] += 1
                 assigned_counts[slot.req_idx] += 1
@@ -251,6 +254,11 @@ def _isoweek(d: str) -> str:
     dt = datetime.strptime(d, "%Y-%m-%d").date()
     y, w, _ = dt.isocalendar()
     return f"{y}-W{w}"
+
+
+def _planning_week(d: str, dates: list[str]) -> str:
+    """Seven-day blocks anchored to the selected roster start date."""
+    return f"plan-W{dates.index(d) // 7 + 1}"
 
 
 def _is_weekend(d: str) -> bool:
@@ -272,12 +280,15 @@ def _objectives(assignments, reqs, assigned_counts, staff, avail, dates, target_
 
     # per-staff aggregates
     hist = avail.get("history", {})
-    load = {sid: {"night": 0, "weekend": 0, "oncall": 0, "hours": 0.0, "depts": set(), "nonpref": 0, "days": 0}
+    load = {sid: {"night": 0, "weekend": 0, "oncall": 0, "hours": 0.0,
+                  "weekly_hours": {}, "depts": set(), "nonpref": 0, "days": 0}
             for sid in staff}
     for a in assignments:
         sid, sh, d = a["staff_id"], a["shift"], a["date"]
         L = load[sid]
         L["hours"] += SHIFT_HOURS[sh][2]
+        week = _planning_week(d, dates)
+        L["weekly_hours"][week] = L["weekly_hours"].get(week, 0) + SHIFT_HOURS[sh][2]
         L["days"] += 1
         L["depts"].add(a["department"])
         if sh == "Night":
@@ -286,8 +297,15 @@ def _objectives(assignments, reqs, assigned_counts, staff, avail, dates, target_
             L["oncall"] += 1
         if _is_weekend(d):
             L["weekend"] += 1
-        if sh != staff[sid]["preferred_shift"]:
-            L["nonpref"] += 1
+        # Preference fit gives partial credit to another eligible shift and
+        # also accounts for a requested weekly day off. This is more useful
+        # than treating every non-first-choice shift as a total failure.
+        penalty = 0.0 if sh == staff[sid]["preferred_shift"] else 0.35
+        off_day = str(staff[sid].get("weekly_off_preference", "")).strip()
+        if off_day and off_day.lower() != "no preference" and \
+                datetime.strptime(d, "%Y-%m-%d").strftime("%A") == off_day:
+            penalty += 0.35
+        L["nonpref"] += min(1.0, penalty)
 
     # fairness within comparable groups (include prior history)
     groups = {}
@@ -308,8 +326,9 @@ def _objectives(assignments, reqs, assigned_counts, staff, avail, dates, target_
     overtime = 0.0
     for sid, L in load.items():
         h = hist.get(sid, {})
-        fatigue += 2 * L["night"] + max(0, L["hours"] - target_week) * 0.5 + h.get("fatigue_score", 0)
-        overtime += max(0, L["hours"] - target_week) + h.get("overtime_hours", 0)
+        weekly_overtime = sum(max(0, hours - target_week) for hours in L["weekly_hours"].values())
+        fatigue += 2 * L["night"] + weekly_overtime * 0.5 + h.get("fatigue_score", 0)
+        overtime += weekly_overtime + h.get("overtime_hours", 0)
 
     # preference violations + unnecessary department changes
     pref_violation = sum(L["nonpref"] for L in load.values()) \
@@ -391,19 +410,84 @@ def _unmet(reqs, assignments) -> list[dict]:
     return unmet
 
 
+def _coverage_by_role(reqs, assignments) -> list[dict]:
+    """Aggregate the scheduling contract into an administrator-facing role view."""
+    counts = {}
+    for a in assignments:
+        key = (a["date"], a["shift"], a["department"], a["assigned_role"])
+        counts[key] = counts.get(key, 0) + 1
+    required, assigned, shortfall = {}, {}, {}
+    for r in reqs:
+        role = r.designation
+        got = counts.get((r.date, r.shift, r.department, role), 0)
+        required[role] = required.get(role, 0) + r.min_count
+        assigned[role] = assigned.get(role, 0) + min(got, r.min_count)
+        shortfall[role] = shortfall.get(role, 0) + max(0, r.min_count - got)
+    rows = []
+    for role, need in required.items():
+        got = assigned.get(role, 0)
+        rows.append({
+            "role": role,
+            "required": need,
+            "assigned": got,
+            "shortfall": shortfall.get(role, 0),
+            "coverage_pct": round(100 * min(got, need) / need, 1) if need else 100.0,
+        })
+    return sorted(rows, key=lambda row: (-row["shortfall"], row["coverage_pct"], row["role"]))
+
+
+def _coverage_by_date_shift(reqs, assignments) -> list[dict]:
+    """Return one row per date/shift so the UI can expose when gaps occur."""
+    required, assigned, role_gaps = {}, {}, {}
+    assignment_counts = {}
+    for a in assignments:
+        key = (a["date"], a["shift"], a["department"], a["assigned_role"])
+        assignment_counts[key] = assignment_counts.get(key, 0) + 1
+    for r in reqs:
+        key = (r.date, r.shift)
+        required[key] = required.get(key, 0) + r.min_count
+        got = assignment_counts.get((r.date, r.shift, r.department, r.designation), 0)
+        assigned[key] = assigned.get(key, 0) + min(got, r.min_count)
+        gap = max(0, r.min_count - got)
+        if gap:
+            role_gaps.setdefault(key, []).append({"role": r.designation, "shortfall": gap})
+    rows = []
+    for key in sorted(required):
+        need, got = required[key], assigned.get(key, 0)
+        rows.append({
+            "date": key[0], "shift": key[1], "required": need, "assigned": got,
+            "shortfall": max(0, need - got),
+            "coverage_pct": round(100 * got / need, 1) if need else 100.0,
+            "role_gaps": role_gaps.get(key, []),
+        })
+    return rows
+
+
+def _comparison_metrics(metrics, assignments, reqs) -> dict:
+    unmet = _unmet(reqs, assignments)
+    return {
+        "coverage_pct": metrics["coverage_pct"],
+        "preference_satisfaction_pct": _pref_satisfaction(metrics, assignments)["satisfaction_pct"],
+        "overtime_hours": round(metrics["overtime"], 2),
+        "unfilled_staff_slots": sum(item["shortfall"] for item in unmet),
+    }
+
+
 def _shortage_action(r: ShiftRequirement) -> str:
     if r.specialist == "obgyn":
-        return "activate on-call OBGYN or arrange obstetric referral"
+        return "Request contracted OB/GYN cover; if unavailable, confirm the obstetric referral pathway"
     if r.department == "Emergency":
-        return "activate emergency on-call / locum cover"
+        return "Request eligible emergency on-call or locum cover before this shift"
     if r.shift == "On-call":
-        return "assign on-call standby or escalate to administrator"
-    return "activate on-call, arrange locum support, or administrator intervention"
+        return "Request an eligible standby clinician or escalate the gap for administrator review"
+    return "Request eligible cross-cover or locum support; do not fill by breaking rest or hour limits"
 
 
 def _fairness_report(load, staff) -> dict:
     """Per-staff loads within comparable role groups + fairness indices.
     Uses only role/skill/availability — never protected attributes (none collected)."""
+    all_weeks = {week for value in load.values() for week in value["weekly_hours"]}
+    target_hours = DEFAULT_TARGET_WEEKLY_HOURS * max(1, len(all_weeks))
     groups = {}
     for sid, s in staff.items():
         groups.setdefault(s["group"], []).append(sid)
@@ -412,15 +496,18 @@ def _fairness_report(load, staff) -> dict:
         members = []
         for sid in sids:
             L = load[sid]
-            if L["days"] > 0:
-                members.append({"staff_name": staff[sid]["staff_name"], "nights": L["night"],
-                                "weekends": L["weekend"], "oncall": L["oncall"], "shifts": L["days"]})
-                all_shifts.append(L["days"])
+            members.append({"staff_name": staff[sid]["staff_name"], "nights": L["night"],
+                            "weekends": L["weekend"], "oncall": L["oncall"], "shifts": L["days"],
+                            "hours": L["hours"],
+                            "target_hours": target_hours,
+                            "overtime_hours": sum(max(0, hours - DEFAULT_TARGET_WEEKLY_HOURS)
+                                                  for hours in L["weekly_hours"].values())})
+            all_shifts.append(L["days"])
         if len(members) >= 2:
             nw = [m["nights"] + m["weekends"] for m in members]
             mean = sum(nw) / len(nw)
             cvs.append(float(np.std(nw)) / (mean + 1))
-            report_groups.append({"group": g, "members": sorted(members, key=lambda m: -m["nights"])})
+            report_groups.append({"group": g, "members": sorted(members, key=lambda m: (-m["nights"], -m["weekends"]))})
     equity = max(0.0, min(100.0, round(100 * (1 - (sum(cvs) / len(cvs) if cvs else 0)), 1)))
     return {
         "shift_equity_index": equity,
@@ -479,6 +566,10 @@ def generate_roster(forecast_by_date: dict, staff_df: pd.DataFrame, start_date, 
     emergency_idx = int(np.argmin([m["emergency_uncovered"] for _, m in decoded]))
 
     b_assign, b_metrics = decoded[balanced_idx]
+    # A deterministic first-eligible decode provides a transparent manual-style
+    # baseline. It obeys the same hard constraints, but does not search the
+    # Pareto space for a better balance of coverage, fatigue and preferences.
+    baseline_assign, baseline_metrics = decode_roster(np.zeros(len(slots)), ctx)
     recommended = _roster_output(b_assign, dates, CONFIRMED_DAYS, start_date)
 
     # locked/completed appear in the output too (immutable).
@@ -507,6 +598,13 @@ def generate_roster(forecast_by_date: dict, staff_df: pd.DataFrame, start_date, 
         "recommendation_reason": _reason(b_metrics, balanced_idx, len(X)),
         "alternative_rosters": alternatives,
         "unmet_staffing_requirements": unmet,
+        "coverage_by_role": _coverage_by_role(reqs, b_assign),
+        "coverage_by_date_shift": _coverage_by_date_shift(reqs, b_assign),
+        "baseline_comparison": {
+            "baseline": _comparison_metrics(baseline_metrics, baseline_assign, reqs),
+            "optimized": _comparison_metrics(b_metrics, b_assign, reqs),
+            "baseline_method": "Deterministic first-eligible assignment using the same hard constraints",
+        },
         "hard_constraint_violations": [],   # feasibility-preserving decode => none
         "soft_constraint_warnings": warnings,
         "fairness_metrics": _fairness_metrics(b_metrics["load"], staff),
@@ -534,20 +632,20 @@ def _lock_row(a, status):
 def _score_block(m):
     return {"coverage_pct": m["coverage_pct"], "understaffing": round(m["understaffing"], 2),
             "unfairness": round(m["unfairness"], 2), "fatigue": round(m["fatigue"], 2),
-            "overtime": round(m["overtime"], 2), "preference_violation": int(m["preference_violation"]),
+            "overtime": round(m["overtime"], 2), "preference_violation": round(m["preference_violation"], 2),
             "mandatory_gap": m["mandatory_gap"]}
 
 
 def _pref_satisfaction(m, assignments):
     total = len(assignments)
     non = sum(L["nonpref"] for L in m["load"].values())
-    return {"assignments": total, "preferred_shift_matches": total - non,
+    return {"assignments": total, "preference_fit_equivalent": round(total - non, 1),
             "satisfaction_pct": round(100 * (total - non) / total, 1) if total else 100.0}
 
 
 def _reason(m, idx, n):
     return (f"Balanced plan selected from {n} feasible Pareto solution(s) using ranking weights "
-            f"(coverage 35%, fairness 25%, fatigue 20%, overtime 10%, preference 10%). "
+            f"(coverage 50%, fairness 15%, fatigue 10%, overtime 10%, preference 15%). "
             f"Coverage {m['coverage_pct']}%, mandatory gap {m['mandatory_gap']}.")
 
 

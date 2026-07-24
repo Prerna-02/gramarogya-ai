@@ -13,16 +13,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.db_models import (
-    DailyDemand, Forecast, PlanningRun, ResourcePlan, RosterEntry, Staff,
+    DailyDemand, Forecast, PlanningRun, ResourcePlan, ResourceStatus, RosterEntry, Staff,
+    StaffAvailability,
 )
 from backend.services.forecasting import future_forecast
-from backend.services.resource_planning import plan_resources
+from backend.services import dashboard_operations, staff_availability as staff_availability_ops
+from backend.services.resource_planning import plan_resource_window
 from backend.services.scheduling_config import SUPPORTED_HORIZONS
 from backend.services.workforce_optimization import generate_roster
 
@@ -41,7 +44,20 @@ def _staff_dataframe(db: Session) -> pd.DataFrame:
             "max_weekly_hours", "max_consecutive_working_days", "minimum_rest_hours",
             "max_night_shifts_per_month", "preferred_shift", "emergency_on_call",
             "employment_type", "weekly_off_preference", "active_status"]
-    return pd.DataFrame([[getattr(r, c) for c in cols] for r in rows], columns=cols)
+    database_staff = pd.DataFrame([[getattr(r, c) for c in cols] for r in rows], columns=cols)
+    # Include newly contracted/on-call records from the maintained workforce
+    # source even before the next full database seed. Database rows remain the
+    # authoritative version whenever the same staff_id exists in both places.
+    source_path = Path(__file__).resolve().parents[2] / "data" / "staff_master.csv"
+    source_staff = pd.read_csv(source_path)[cols]
+    missing = source_staff[~source_staff["staff_id"].isin(set(database_staff["staff_id"]))]
+    if not missing.empty:
+        # Incrementally synchronize newly contracted staff without truncating
+        # operational tables. This also preserves roster-entry foreign keys.
+        for record in missing.where(pd.notna(missing), None).to_dict("records"):
+            db.add(Staff(**record))
+        db.flush()
+    return pd.concat([database_staff, missing], ignore_index=True)
 
 
 def _nearest_roster_horizon(forecast_horizon: int, requested: int | None) -> int:
@@ -73,9 +89,25 @@ def run_planning_cycle(db: Session, start_date: date | None = None, horizon_days
                                 target=t, predicted_value=float(day[t]), model="XGBoost"))
 
         # 2) Resource plans (per day) + daily risk
+        staff_rows = list(db.scalars(select(Staff).order_by(Staff.staff_name)).all())
+        latest_resource = db.scalar(select(ResourceStatus).order_by(ResourceStatus.date.desc()).limit(1))
+        availability_records = list(db.scalars(
+            select(StaffAvailability)
+            .where(StaffAvailability.date.between(
+                start_date, start_date + timedelta(days=horizon_days - 1)
+            ))
+        ).all())
+        planning_dates = [start_date + timedelta(days=offset) for offset in range(horizon_days)]
+        daily_staff_availability = staff_availability_ops.resource_availability_by_date(
+            staff_rows, availability_records, planning_dates
+        )
+        resource_plans = plan_resource_window(
+            forecast,
+            dashboard_operations.availability_from_status(latest_resource, staff_rows),
+            availability_by_date=daily_staff_availability,
+        )
         daily_status = []
-        for day in forecast:
-            plan = plan_resources({t: day[t] for t in TARGETS})
+        for day, plan in zip(forecast, resource_plans):
             d = datetime.strptime(day["date"], "%Y-%m-%d").date()
             lines = list(plan["staff"].values()) + list(plan["beds"].values()) \
                 + list(plan["medicines"].values()) + [plan["oxygen"], plan["ambulances"]]
@@ -94,6 +126,10 @@ def run_planning_cycle(db: Session, start_date: date | None = None, horizon_days
             fbd = {day["date"]: {t: day[t] for t in TARGETS} for day in forecast[:roster_h]}
             staff_df = _staff_dataframe(db)
             roster_result = generate_roster(fbd, staff_df, start_date, roster_h,
+                                            availability=staff_availability_ops.workforce_availability(
+                                                [record for record in availability_records
+                                                 if record.date < start_date + timedelta(days=roster_h)]
+                                            ),
                                             planning_run_id=run.planning_run_id,
                                             pop_size=24, n_gen=15)
             for a in roster_result["recommended_roster"]:

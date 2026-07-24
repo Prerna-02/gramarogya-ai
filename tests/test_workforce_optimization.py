@@ -46,12 +46,18 @@ def roster():
 def test_output_schema_and_balanced_selection(roster):
     for k in ["roster_run_id", "recommended_roster", "recommended_roster_scores",
               "recommendation_reason", "alternative_rosters", "unmet_staffing_requirements",
-              "hard_constraint_violations", "fairness_metrics", "optimization_metadata"]:
+              "hard_constraint_violations", "fairness_metrics", "optimization_metadata",
+              "coverage_by_role", "coverage_by_date_shift", "baseline_comparison"]:
         assert k in roster
     assert roster["recommended_roster"]                      # a usable roster exists
     assert "Balanced" in roster["recommendation_reason"] or "balanced" in roster["recommendation_reason"]
     assert roster["optimization_metadata"]["seed"] == cfg.SEED
     assert roster["optimization_metadata"]["objective_values"]
+    assert all({"role", "required", "assigned", "shortfall", "coverage_pct"} <= set(row)
+               for row in roster["coverage_by_role"])
+    assert all({"date", "shift", "required", "assigned", "shortfall", "coverage_pct"} <= set(row)
+               for row in roster["coverage_by_date_shift"])
+    assert set(roster["baseline_comparison"]) == {"baseline", "optimized", "baseline_method"}
 
 
 def test_no_hard_constraint_violations(roster):
@@ -92,9 +98,11 @@ def test_shift_eligibility_respected(roster):
 def test_max_weekly_hours(roster):
     recs = build_staff_records(STAFF_DF)
     hours = defaultdict(lambda: defaultdict(float))
+    start = datetime.strptime(roster["start_date"], "%Y-%m-%d").date()
     for a in roster["recommended_roster"]:
-        y, w, _ = datetime.strptime(a["date"], "%Y-%m-%d").date().isocalendar()
-        hours[a["staff_id"]][(y, w)] += cfg.SHIFT_HOURS[a["shift"]][2]
+        day = datetime.strptime(a["date"], "%Y-%m-%d").date()
+        planning_week = (day - start).days // 7
+        hours[a["staff_id"]][planning_week] += cfg.SHIFT_HOURS[a["shift"]][2]
     for sid, weeks in hours.items():
         for h in weeks.values():
             assert h <= recs[sid]["max_weekly_hours"]

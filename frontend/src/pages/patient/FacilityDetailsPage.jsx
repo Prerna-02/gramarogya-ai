@@ -1,20 +1,32 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { api } from '../../api.js'
+import DoctorAvailability from '../../components/DoctorAvailability.jsx'
 import { useI18n } from '../../i18n.jsx'
 
 export default function FacilityDetailsPage() {
   const { t } = useI18n()
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [f, setF] = useState(null)
   const [error, setError] = useState('')
 
-  useEffect(() => { api.facilityDetail(id).then(setF).catch((e) => setError(e.message)) }, [id])
+  const specialities = searchParams.getAll('speciality')
+  const specialityKey = specialities.join('|')
+
+  useEffect(() => {
+    const requestedSpecialities = specialityKey ? specialityKey.split('|') : []
+    api.facilityDetail(id, requestedSpecialities).then(setF).catch((e) => setError(e.message))
+  }, [id, specialityKey])
 
   if (error) return <div className="pt-page"><p className="pt-muted">{error}</p></div>
   if (!f) return <div className="pt-page"><p className="pt-muted">…</p></div>
+
+  const exactSpecialists = f.matched_doctors?.filter((doctor) => doctor.speciality === specialities[0]) || []
+  const recommendedDoctors = exactSpecialists.length ? exactSpecialists : (f.matched_doctors?.slice(0, 1) || [])
+  const recommendedIds = new Set(recommendedDoctors.map((doctor) => doctor.doctor_id))
 
   // Search the map by NAME so the provider's verified geocoding places it,
   // rather than relying on approximate prototype coordinates.
@@ -39,6 +51,21 @@ export default function FacilityDetailsPage() {
       <h3 className="pt-section">{t('services_available')}</h3>
       <div className="pt-tags">
         {f.capabilities.map((c) => <span key={c} className="pt-tag">{c}</span>)}
+      </div>
+
+      {specialities.length > 0 && <>
+        <h3 className="pt-section">Recommended for your problem</h3>
+        <div className="pt-doctor-list recommended">
+          {recommendedDoctors.length ? recommendedDoctors.map((doctor) => <DoctorAvailability key={doctor.doctor_id} doctor={doctor} />) :
+            <p className="pt-muted">No matching specialist is listed. Please call the hospital before travelling.</p>}
+        </div>
+      </>}
+
+      <h3 className="pt-section">{specialities.length ? 'Other available doctors' : 'Doctors and consultation times'}</h3>
+      <div className="pt-doctor-list">
+        {f.doctors?.length ? f.doctors.filter((doctor) => !recommendedIds.has(doctor.doctor_id))
+          .map((doctor) => <DoctorAvailability key={doctor.doctor_id} doctor={doctor} />) :
+          <p className="pt-muted">Call the hospital to confirm doctor availability.</p>}
       </div>
 
       <div className="pt-actions">

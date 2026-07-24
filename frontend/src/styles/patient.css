@@ -109,6 +109,21 @@
 .pt-fac-foot { display: flex; justify-content: space-between; align-items: center; }
 .pt-link { color: var(--pt-primary); font-size: 0.8rem; font-weight: 600; }
 
+/* Public doctor availability */
+.pt-doctor-list { display: flex; flex-direction: column; gap: .6rem; }
+.pt-doctor-list.recommended { padding: .55rem; border: 1px solid #bfe6d7; border-radius: 15px; background: #edf9f4; }
+.pt-doctor { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .75rem; border: 1px solid var(--pt-line); border-radius: 13px; background: #fff; }
+.pt-doctor.compact { grid-template-columns: 34px minmax(0, 1fr) auto; padding: .65rem; margin: .2rem 0 .7rem; background: #f7fbf9; }
+.pt-doctor-avatar { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; color: #087153; background: #dff5ec; font-size: .78rem; font-weight: 800; }
+.pt-doctor.compact .pt-doctor-avatar { width: 34px; height: 34px; border-radius: 10px; font-size: .7rem; }
+.pt-doctor-copy { min-width: 0; display: flex; flex-direction: column; gap: .1rem; }.pt-doctor-copy strong { color: var(--pt-ink); font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pt-doctor-copy span { color: var(--pt-ink2); font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.pt-doctor-copy small { color: #60766e; font-size: .68rem; }
+.pt-doctor-status { align-self: start; border-radius: 999px; padding: .25rem .48rem; font-size: .62rem; font-weight: 750; white-space: nowrap; }
+.pt-doctor-status.available { color: #117149; background: #dcfce7; }.pt-doctor-status.on-call { color: #135ca1; background: #dbeafe; }.pt-doctor-status.busy { color: #9a5b08; background: #fef3c7; }
+.pt-doctor-status.later { color: #6652a3; background: #ede9fe; }.pt-doctor-status.unavailable { color: #ad2932; background: #fee2e2; }
+.pt-speciality-match { display: flex; flex-direction: column; gap: .18rem; padding: .75rem .9rem; border-left: 4px solid var(--pt-primary); border-radius: 10px; background: #fff; }
+.pt-speciality-match span { color: var(--pt-ink2); font-size: .72rem; }.pt-speciality-match strong { color: var(--pt-ink); font-size: .84rem; }
+
 /* Status pills */
 .pt-status { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; }
 .pt-status.Available { background: #dcfce7; color: #15803d; }
@@ -178,3 +193,13 @@
 .pt-emerg-banner { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border-radius: 15px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; font-weight: 700; box-shadow: 0 10px 24px rgba(220,38,38,0.35); animation: sospulse 2s infinite; }
 .pt-emerg-call { align-self: flex-start; background: #fff; color: #dc2626; text-decoration: none; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 800; }
 .pt-note { background: #eef7f2; border: 1px solid #cfeadd; color: #14532d; border-radius: 12px; padding: 0.7rem 0.9rem; font-size: 0.82rem; }
+
+/* Readable patient-facing type on mobile and desktop */
+.pt-brand { font-size: 1.05rem; }.pt-lang-btn { font-size: .88rem; }
+.pt-hello p, .pt-search, .pt-searchbar input { font-size: 1rem; }
+.pt-hero-text h2 { font-size: 1.2rem; }.pt-hero-text p { font-size: .94rem; }.pt-section { font-size: 1.05rem; }
+.pt-qtile { font-size: .82rem; }.pt-fac-type, .pt-fac-meta, .pt-link { font-size: .9rem; }.pt-best { font-size: .78rem; }
+.pt-doctor-copy strong, .pt-speciality-match strong { font-size: .96rem; }.pt-doctor-copy span, .pt-speciality-match span { font-size: .84rem; }.pt-doctor-copy small { font-size: .8rem; }.pt-doctor-status { font-size: .74rem; }
+.pt-status, .pt-stat, .pt-number span, .pt-verified, .pt-disclaimer { font-size: .82rem; }
+.pt-chip, .pt-tag, .pt-note { font-size: .92rem; }.pt-nav-item { font-size: .78rem; }
+.pt-outbreak p { font-size: .96rem; }
