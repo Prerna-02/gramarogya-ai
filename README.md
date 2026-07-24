@@ -1,3 +1,15 @@
+<!-- The YAML block below configures the Hugging Face Space. GitHub renders it as
+     a small metadata table; it is required by HF and harmless everywhere else. -->
+---
+title: GramArogya AI
+emoji: 🏥
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # GramArogya AI
 
 > **An AI-powered rural healthcare operations and patient-access prototype for demand forecasting, fair workforce scheduling, resource planning, emergency coordination, and facility guidance.**

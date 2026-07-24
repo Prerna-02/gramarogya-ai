@@ -23,6 +23,7 @@ psycopg[binary]
 alembic
 
 # Auth / security
+bcrypt
 passlib[bcrypt]
 python-jose[cryptography]
 python-dotenv

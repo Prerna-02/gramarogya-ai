@@ -1,0 +1,40 @@
+# Keep the image lean — nothing here is needed to RUN the app.
+# (These files are for development/understanding, not deployment.)
+
+# Docs, presentation, guides
+docs/
+*.md
+!README.md
+
+# Notebooks and tests
+notebooks/
+tests/
+
+# Dev tooling / scratch
+scripts/build_visualization_guide_docx.py
+.git/
+.github/
+.vscode/
+.idea/
+
+# Python caches / envs
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Node (rebuilt inside the image)
+frontend/node_modules/
+frontend/dist/
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+
+# Large intermediate datasets not needed to seed the DB
+data/demand_resource_daily_before_phase6.csv
+data/demand_forecasting_historical.csv
+data/resource_allocation_historical.csv
