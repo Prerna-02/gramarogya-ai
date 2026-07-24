@@ -31,8 +31,8 @@ COPY data/ ./data/
 # Bundled production frontend from stage 1.
 COPY --from=frontend /fe/dist ./frontend/dist
 
-# Hugging Face Spaces route traffic to port 7860 by default.
+# Listens on $PORT when the host provides one (Render), else 7860 (Hugging Face).
 EXPOSE 7860
 
 # Seed on first boot (idempotent, non-fatal), then serve the app.
-CMD ["sh", "-c", "python -m backend.startup_seed; exec uvicorn backend.main:app --host 0.0.0.0 --port 7860"]
+CMD ["sh", "-c", "python -m backend.startup_seed; exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
